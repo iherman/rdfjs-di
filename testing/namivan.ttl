@@ -1,0 +1,19 @@
+@prefix sec: <https://w3id.org/security#>.
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns>.
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix dc: <http://purl.org/dc/terms/>.
+@prefix foaf: <http://xmlns.com/foaf/0.1/>.
+@prefix doap: <http://usefulinc.com/ns/doap#>.
+@prefix earl: <http://www.w3.org/ns/earl#>.
+
+<urn:uuid:7b81097b-9d58-4f5c-a25b-ecaec92e6511> a sec:DataIntegrityProof;
+    sec:cryptosuite "ecdsa-2022";
+    sec:created "2024-02-20T14:56:16.681Z"^^xsd:dateTime;
+    sec:verificationMethod <urn:uuid:7fc2da2b-67f6-4f67-a3fd-a700fdf226fa>;
+    sec:proofValue "zDTazD-tj6xhF_xPYBTGyuYC0QiyC6SrLksL_Ur81UXvFQhxrx-Z7IeqJLfMpot3-s19F8pTxNVgFyt75t6GGjA";
+    sec:proofPurpose sec:authenticationMethod.
+<urn:uuid:7fc2da2b-67f6-4f67-a3fd-a700fdf226fa> a sec:JsonWebKey;
+    sec:controller "https://www.ivan-herman.net#me";
+    sec:publicKeyJwk "{\n    \"key_ops\": [\n        \"verify\"\n    ],\n    \"ext\": true,\n    \"kty\": \"EC\",\n    \"x\": \"nFy4GQohAzeeX2pgEp3l3J9HNmMFFjpwErRS0vAaeWU\",\n    \"y\": \"HCRYhrBk_8Qhfsjj26J3KVjGFMRA4svl2htVIWk7S7I\",\n    \"crv\": \"P-256\"\n}"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON>.
+
