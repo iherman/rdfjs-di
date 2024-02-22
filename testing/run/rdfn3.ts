@@ -40,13 +40,14 @@ export function dataset_to_nquads(quads: Iterable<rdf.Quad>): string[] {
  * @returns 
  */
 export async function get_quads(fname: string): Promise<rdf.DatasetCore> {
-    const trigStream = fs.createReadStream(fname, 'utf-8');
+    const trigStream = fs.createReadStream(`testing/tests/${fname}`, 'utf-8');
     const store = new n3.Store();
     const parser = new n3.StreamParser({ blankNodePrefix: '' });
     store.import(parser);
     await pipeline(trigStream, parser)
     return store;
 }
+
 const prefixes = {
     sec: "https://w3id.org/security#",
     rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns",
