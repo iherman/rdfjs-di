@@ -1,10 +1,11 @@
-import * as rdf from '@rdfjs/types';
-import * as n3 from 'n3';
-import * as di from '../../index';
-import { get_quads, DataFactory, write_quads } from './rdfn3';
-import { DI_ECDSA } from '../../lib/di';
+import * as rdf    from '@rdfjs/types';
+import { Command } from 'commander';
 
-async function generateKeys(): Promise<di.KeyPair> {
+import { KeyPair, DI_ECDSA } from '../../index';
+
+import { get_quads, DataFactory, write_quads } from './rdfn3';
+
+async function generateKeys(): Promise<KeyPair> {
     const newPair = await crypto.subtle.generateKey(
         {
             name: "ECDSA",
@@ -20,19 +21,47 @@ async function generateKeys(): Promise<di.KeyPair> {
 }
 
 async function main() {
-    const input   = (process.argv.length > 2) ? process.argv[2] : 'small.ttl';
+    const program = new Command();
+    program
+        .name('main [testfile]')
+        .description('Make a roundrip for signing and verifying')
+        .usage('[options] [file name]')
+        .option('-a --anchor', 'Anchor the proof graph to the file name (if relevant)')
+        .option('-e --embed',  'Create an embedded proof')
+        .option('-s --silent', 'No extra output')
+        .option('-n --no', 'No graph output')
+        .option('-v --verify', 'Verify the proof')
+        .parse(process.argv)
+
+    const options = program.opts();
+
+    const embed  = options.embed ? true : false ;
+    const verify = options.verify ? true : false ;
+    const silent = options.silent ? true : false;
+    const no_output = options.no ? true : false;
+
+    const input = (program.args.length === 0) ? 'small.ttl' : program.args[0];
+    const anchor = options.anchor ? DataFactory.namedNode(`file:///${input}`) : undefined ;
+
     const keyPair = await generateKeys();
     const dataset = await get_quads(input);
-    const anchor  = DataFactory.namedNode('file:///report.ttl');
     const di_ecdsa = new DI_ECDSA();
 
-//    const proof: rdf.DatasetCore = await (new di.DI_ECDSA()).embedProofGraph(dataset, keyPair, anchor);
-    const proofGraph: rdf.DatasetCore = await di_ecdsa.signDataset(dataset, keyPair);
-    // console.log(`${JSON.stringify(keyPair,null,4)}`)
-    write_quads(proofGraph);
+    let proof: rdf.DatasetCore;
+    let result: boolean = false;
 
-    const result = await di_ecdsa.validateSignedDataset(dataset, proofGraph);
-    console.log(`>>> Result of verification: ${result}`);
+    if (embed) {
+        if (!silent) console.log(`>>> Generating embedded proof for "${input}", with anchor at "${JSON.stringify(anchor,null,2)}"\n`);
+        proof = await di_ecdsa.embedProofGraph(dataset, keyPair, anchor);
+        result = (verify) ? await di_ecdsa.verifyEmbeddedProofGraph(proof) : false
+    } else {
+        if (!silent) console.log(`Generating a proof graph for "${input}"\n`);
+        proof = await di_ecdsa.generateProofGraph(dataset, keyPair);
+        result = (verify) ? await di_ecdsa.verifyProofGraph(dataset, proof) : false
+    }
+
+    if (!no_output) write_quads(proof);
+    if (!silent) console.log(verify ? `>>> Verification result: ${result}` : `>>> No verification was required`);
 }
 
 
