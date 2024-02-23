@@ -5,6 +5,8 @@ import { KeyPair, DI_ECDSA } from '../../index';
 
 import { get_quads, DataFactory, write_quads } from './rdfn3';
 
+const myFoaf = "https://www.ivan-herman.net#me";
+
 async function generateKeys(): Promise<KeyPair> {
     const newPair = await crypto.subtle.generateKey(
         {
@@ -52,11 +54,11 @@ async function main() {
 
     if (embed) {
         if (!silent) console.log(`>>> Generating embedded proof for "${input}", with anchor at "${JSON.stringify(anchor,null,2)}"\n`);
-        proof = await di_ecdsa.embedProofGraph(dataset, keyPair, anchor);
+        proof = await di_ecdsa.embedProofGraph(dataset, keyPair, myFoaf, anchor);
         result = (verify) ? await di_ecdsa.verifyEmbeddedProofGraph(proof) : false
     } else {
         if (!silent) console.log(`Generating a proof graph for "${input}"\n`);
-        proof = await di_ecdsa.generateProofGraph(dataset, keyPair);
+        proof = await di_ecdsa.generateProofGraph(dataset, keyPair, myFoaf);
         result = (verify) ? await di_ecdsa.verifyProofGraph(dataset, proof) : false
     }
 

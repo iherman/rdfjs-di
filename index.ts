@@ -23,15 +23,45 @@ export interface KeyPair {
     private: JsonWebKey;
 }
 
-/* Various namespaces, necessary when constructing a proof graph */
-const sec_prefix = "https://w3id.org/security#";
-const rdf_prefix = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
-const xsd_prefix = "http://www.w3.org/2001/XMLSchema#";
-const myFoaf     = "https://www.ivan-herman.net#me";
+/***************************************************************************************
+ * Namespace handling
+ **************************************************************************************/
 
-const rdf_type     = namedNode(`${rdf_prefix}type`);
-const sec_proof    = namedNode(`${sec_prefix}proof`);
-const sec_di_proof = namedNode(`${sec_prefix}DataIntegrityProof`);
+function createPrefix(uri: string): (l: string) => rdf.NamedNode {
+    class prefix {
+        private _mapping: Record<string, rdf.NamedNode> = {};
+        private _base: string;
+        constructor(base: string) {
+            this._base = base;
+        }
+        value(local: string): rdf.NamedNode {
+            if (local in this._mapping) {
+                return this._mapping[local];
+            } else {
+                const retval: rdf.NamedNode = namedNode(`${this._base}${local}`);
+                this._mapping[local] = retval;
+                return retval;
+            }
+        }
+    }
+    const mapping = new prefix(uri);
+    const get_value = (local: string): rdf.NamedNode => {
+        return mapping.value(local);
+    };
+    return get_value;
+}
+
+/* Various namespaces, necessary when constructing a proof graph */
+const sec_prefix = createPrefix("https://w3id.org/security#");
+const rdf_prefix = createPrefix("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+const xsd_prefix = createPrefix("http://www.w3.org/2001/XMLSchema#");
+
+const rdf_type: rdf.NamedNode         = rdf_prefix('type');   
+const sec_proof: rdf.NamedNode        = sec_prefix('proof');
+const sec_proofGraph: rdf.NamedNode   = sec_prefix('ProofGraph');
+const sec_di_proof: rdf.NamedNode     = sec_prefix('DataIntegrityProof');
+const sec_proofValue: rdf.NamedNode   = sec_prefix('proofValue');
+const sec_publicKeyJwk: rdf.NamedNode = sec_prefix('publicKeyJwk');
 
 
 /*****************************************************************************************
@@ -187,7 +217,7 @@ abstract class DataIntegrity {
      * @param keyPair 
      * @returns 
      */
-    async generateProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair): Promise<rdf.DatasetCore> {
+    async generateProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair, controller ?: string): Promise<rdf.DatasetCore> {
         // Calculate the hash of the dataset, and sign the hash with the secret key
         // This is the "core"...
         const signHashValue = async (): Promise<string> => {
@@ -217,34 +247,32 @@ abstract class DataIntegrity {
 
             retval.addQuads([
                 quad(
-                    proofGraph, rdf_type, namedNode(`${sec_prefix}DataIntegrityProof`)
+                    proofGraph, rdf_type, sec_di_proof
                 ),
                 quad(
-                    proofGraph, namedNode(`${sec_prefix}cryptosuite`), literal(this._cryptosuite)
+                    proofGraph, sec_prefix('cryptosuite'), literal(this._cryptosuite)
                 ),
                 quad(
-                    proofGraph, namedNode(`${sec_prefix}created`), literal((new Date()).toISOString(),namedNode(`${xsd_prefix}dateTime`))
+                    proofGraph, sec_prefix('created'), literal((new Date()).toISOString(),xsd_prefix('dateTime'))
                 ),
                 quad(
-                    proofGraph, namedNode(`${sec_prefix}verificationMethod`), keyGraph
+                    proofGraph, sec_prefix('verificationMethod'), keyGraph
                 ),
                 quad(
-                    proofGraph, namedNode(`${sec_prefix}proofValue`), literal(proofValue)
+                    proofGraph, sec_proofValue, literal(proofValue)
                 ),
                 quad(
-                    proofGraph, namedNode(`${sec_prefix}proofPurpose`), namedNode(`${sec_prefix}authenticationMethod`)
+                    proofGraph, sec_prefix('proofPurpose'), sec_prefix('authenticationMethod')
                 ),
 
                 quad(
-                    keyGraph, rdf_type, namedNode(`${sec_prefix}JsonWebKey`)
+                    keyGraph, rdf_type, sec_prefix('JsonWebKey')
                 ),
                 quad(
-                    keyGraph, namedNode(`${sec_prefix}controller`), literal(myFoaf)
-                ),
-                quad(
-                    keyGraph, namedNode(`${sec_prefix}publicKeyJwk`), literal(JSON.stringify(keyPair.public),namedNode(`${rdf_prefix}JSON`))
+                    keyGraph, sec_publicKeyJwk, literal(JSON.stringify(keyPair.public), rdf_prefix('JSON'))
                 ),
             ]);
+            if (controller) retval.add(quad(keyGraph, sec_prefix('controller'), namedNode(controller)))
             return retval;
         };
 
@@ -283,7 +311,7 @@ abstract class DataIntegrity {
 
         const getProofValue = (store: n3.Store): string => {
             // Retrieve the signature value per spec:
-            const proof_values: rdf.Quad[] = proof.getQuads(null, namedNode(`${sec_prefix}proofValue`), null, null);
+            const proof_values: rdf.Quad[] = proof.getQuads(null, sec_proofValue, null, null);
             if (proof_values.length !== 1) {
                 throw new Error("Incorrect proof values");
             }
@@ -291,7 +319,7 @@ abstract class DataIntegrity {
         };
 
         const getPublicKey = (store: n3.Store): JsonWebKey => {
-            const keys: rdf.Quad[] = proof.getQuads(null, `${sec_prefix}publicKeyJwk`, null, null);
+            const keys: rdf.Quad[] = proof.getQuads(null, sec_publicKeyJwk, null, null);
             if (keys.length !== 1) {
                 throw new Error("Incorrect key values");
             }
@@ -323,11 +351,11 @@ abstract class DataIntegrity {
      * @param anchor 
      * @returns 
      */
-    async embedProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair, anchor: rdf.Quad_Subject = undefined): Promise<rdf.DatasetCore> {
+    async embedProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair, controller ?: string, anchor ?: rdf.Quad_Subject): Promise<rdf.DatasetCore> {
         const retval = convertToStore(dataset);
 
         const proofGraphID = retval.createBlankNode();
-        const proofTriples = await this.generateProofGraph(dataset, keyPair);
+        const proofTriples = await this.generateProofGraph(dataset, keyPair, controller);
         for (const q of proofTriples) {
             retval.add(quad(q.subject, q.predicate, q.object, proofGraphID));
         };
@@ -365,9 +393,9 @@ abstract class DataIntegrity {
         for (const q of datasetStore) {
             if (q.graph.equals(proofGraphID)) {
                 proofGraph.add(quad(q.subject,q.predicate,q.object));
-            } else if (q.object.equals(namedNode(`${sec_prefix}ProofGraph`))) {
+            } else if (q.object.equals(sec_proofGraph)) {
                 continue;
-            } else if (q.predicate.equals(namedNode(`${sec_prefix}proof`))) {
+            } else if (q.predicate.equals(sec_proof)) {
                 continue;
             } else {
                 signedGraph.add(q);
