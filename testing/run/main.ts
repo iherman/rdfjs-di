@@ -46,6 +46,7 @@ async function main() {
     const anchor = options.anchor ? DataFactory.namedNode(`file:///${input}`) : undefined ;
 
     const keyPair = await generateKeys();
+    console.log(JSON.stringify(keyPair,null,4))
     const dataset = await get_quads(input);
     const di_ecdsa = new DI_ECDSA();
 

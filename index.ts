@@ -20,7 +20,7 @@ enum Confidentiality {
  */
 export interface KeyPair {
     public: JsonWebKey,
-    private: JsonWebKey;
+    private: JsonWebKey,
 }
 
 /***************************************************************************************
