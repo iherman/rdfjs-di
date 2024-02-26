@@ -21,7 +21,8 @@
             "crv": "P-256",
             "d": "4Gd_JxAFt1zA2kWMyMyRlJcEtyw2eIroUmbXawfT5Ls"
         },
-        "controller": "https://www.ivan-herman.net/#me"
+        "controller": "https://www.ivan-herman.net/#me",
+        "expires": "2055-02-24T00:00:00Z"
     },
     {
         "public": {

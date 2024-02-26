@@ -6,7 +6,7 @@
 @prefix earl: <http://www.w3.org/ns/earl#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 
-<file:///report.ttl> foaf:primaryTopic <https://iherman.github.io/rdfjs-c14n/> ;
+<file:///small.ttl> foaf:primaryTopic <https://iherman.github.io/rdfjs-c14n/> ;
   dc:issued  "2024-02-14T13:21:08.700Z"^^xsd:dateTime ;
   foaf:maker <https://www.ivan-herman.net/foaf#me> .
 

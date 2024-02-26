@@ -4,22 +4,7 @@ import { Command } from 'commander';
 import { KeyPair, DI_ECDSA } from '../../index';
 
 import { get_quads, DataFactory, write_quads } from './rdfn3';
-import { get_keys }                            from './keys';
-
-async function generateKeys(): Promise<KeyPair> {
-    const newPair = await crypto.subtle.generateKey(
-        {
-            name: "ECDSA",
-            namedCurve: "P-256"
-        },
-        true,
-        ["sign", "verify"]
-    );
-    return {
-        public: await crypto.subtle.exportKey("jwk", newPair.publicKey),
-        private: await crypto.subtle.exportKey("jwk", newPair.privateKey)
-    };
-}
+import { get_keys, OSet }                      from './keys';
 
 async function main() {
     const program = new Command();
@@ -48,30 +33,44 @@ async function main() {
     const input = (program.args.length === 0) ? 'small.ttl' : program.args[0];
     const anchor = options.anchor ? DataFactory.namedNode(`file:///${input}`) : undefined ;
 
-    const keys: Iterable<KeyPair> = await get_keys();
-    const keyPair = keys instanceof Array ? keys[0] : null
-    console.log(keyPair);
-    process.exit(0);
-
+    const keyPairs: Iterable<KeyPair> = await get_keys();
     // const keyPair = await generateKeys();
     const dataset = await get_quads(input);
     const di_ecdsa = new DI_ECDSA();
 
-    let proof: rdf.DatasetCore;
-    let result: boolean = false;
+    if (proof_set || proof_chain) {
+        let proofs: rdf.DatasetCore[] = [];
+        const finalKeyPairs = proof_chain ? keyPairs : new OSet<KeyPair>(keyPairs);
 
-    if (embed) {
-        if (!quiet) console.log(`>>> Generating embedded proof for "${input}", with anchor at "${JSON.stringify(anchor,null,2)}"\n`);
-        proof = await di_ecdsa.embedProofGraph(dataset, keyPair, anchor);
-        result = (verify) ? await di_ecdsa.verifyEmbeddedProofGraph(proof) : false
+        let results: boolean[] = [false];
+        if (embed) {
+            if (!quiet) console.log(`>>> Generating embedded proofs for "${input}", with anchor at "${JSON.stringify(anchor, null, 2)}"\n`);
+            proofs = [await di_ecdsa.embedProofGraph(dataset, finalKeyPairs, anchor)];
+        } else {
+            if (!quiet) console.log(`Generating a proof graphs for "${input}"\n`);
+            proofs = await di_ecdsa.generateProofGraph(dataset, finalKeyPairs);
+            results = (verify) ? await di_ecdsa.verifyProofGraph(dataset, proofs) : [false]
+        }
+        if (!no_output) for (const proof of proofs) write_quads(proof)
+        if (!quiet) console.log(verify ? `>>> Verification results: ${results}` : `>>> No verification was required`);
     } else {
-        if (!quiet) console.log(`Generating a proof graph for "${input}"\n`);
-        proof = await di_ecdsa.generateProofGraph(dataset, keyPair);
-        result = (verify) ? await di_ecdsa.verifyProofGraph(dataset, proof) : false
-    }
+        const keyPair: KeyPair = keyPairs instanceof Array ? keyPairs[0] : null
+        let proof: rdf.DatasetCore;
+        let result: boolean = false;
 
-    if (!no_output) write_quads(proof);
-    if (!quiet) console.log(verify ? `>>> Verification result: ${result}` : `>>> No verification was required`);
+        if (embed) {
+            if (!quiet) console.log(`>>> Generating embedded proof for "${input}", with anchor at "${JSON.stringify(anchor,null,2)}"\n`);
+            proof = await di_ecdsa.embedProofGraph(dataset, keyPair, anchor);
+            result = (verify) ? await di_ecdsa.verifyEmbeddedProofGraph(proof) : false
+        } else {
+            if (!quiet) console.log(`Generating a proof graph for "${input}"\n`);
+            proof = await di_ecdsa.generateProofGraph(dataset, keyPair);
+            result = (verify) ? await di_ecdsa.verifyProofGraph(dataset, proof) : false
+        }
+
+        if (!no_output) write_quads(proof);
+        if (!quiet) console.log(verify ? `>>> Verification result: ${result}` : `>>> No verification was required`);
+    }
 }
 
 

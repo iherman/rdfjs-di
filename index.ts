@@ -28,6 +28,16 @@ export interface KeyPair {
     revoked    ?: string,
 }
 
+/**
+ * Type guard to check if an object implements the KeyPair interface.
+ * 
+ * @param obj 
+ * @returns 
+ */
+function isKeyPair(obj: any): obj is KeyPair {
+    return (obj as KeyPair).public !== undefined && (obj as KeyPair).private !== undefined;
+}
+
 /***************************************************************************************
  * Namespace handling
  **************************************************************************************/
@@ -71,10 +81,21 @@ const xsd_datetime: rdf.NamedNode     = xsd_prefix('dateTime');
 
 
 /*****************************************************************************************
- * 
  * Utility Functions
- * 
  *****************************************************************************************/
+
+/**
+ * Type guard to check if an object implements the rdf.DatasetCore interface.
+ * 
+ * @param obj 
+ * @returns 
+ */
+function isDatasetCore(obj: any): obj is rdf.DatasetCore {
+    return  (obj as rdf.DatasetCore).add !== undefined && 
+            (obj as rdf.DatasetCore).delete !== undefined &&
+            (obj as rdf.DatasetCore).match !== undefined &&
+            (obj as rdf.DatasetCore).has !== undefined;
+}
 
 /**
  * Text to array buffer, needed for crypto operations
@@ -219,15 +240,14 @@ abstract class DataIntegrity {
      * Generate a (separate) proof graph, per the DI spec. The signature is stored in 
      * multibase format, using base64url encoding.
      * 
-     * @param dataset 
+     * @param hashValue - this is the value of the Dataset's canonical hash 
      * @param keyPair 
      * @returns 
      */
-    async generateProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair | Iterable<KeyPair>): Promise<rdf.DatasetCore> {
+    protected async generateAProofGraph(hashValue: string, keyPair: KeyPair): Promise<rdf.DatasetCore> {
         // Calculate the hash of the dataset, and sign the hash with the secret key
         // This is the "core"...
         const signHashValue = async (): Promise<string> => {
-            const toBeSigned = await calculateDatasetHash(dataset);
             const key: CryptoKey = await this.importKey(keyPair.private, Confidentiality.secret);
             const raw_signature: ArrayBuffer = await crypto.subtle.sign(
                 {
@@ -235,7 +255,7 @@ abstract class DataIntegrity {
                     hash: this._hash
                 },
                 key,
-                textToArrayBuffer(toBeSigned)
+                textToArrayBuffer(hashValue)
             );
             return `u${arrayBufferToBase64Url(raw_signature)}`;           
         };
@@ -287,6 +307,32 @@ abstract class DataIntegrity {
         return createProofGraph(await signHashValue());
     }
 
+
+    /**
+     * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in 
+     * multibase format, using base64url encoding.
+     * 
+     * This is just a wrapper around {@link generateAProofGraph} to take care of multiple key pairs.
+     * 
+     * @param dataset 
+     * @param keyPair 
+     * @returns 
+     */
+    async generateProofGraph(dataset: rdf.DatasetCore, keyPair: Iterable<KeyPair>): Promise<rdf.DatasetCore[]>;
+    async generateProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair): Promise<rdf.DatasetCore>;
+    async generateProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair | Iterable<KeyPair>): Promise<rdf.DatasetCore | rdf.DatasetCore[]> {
+        // This is to be signed
+        const toBeSigned = await calculateDatasetHash(dataset);
+        // prepare for the overload of arguments
+        const keyPairs: Iterable<KeyPair> = isKeyPair(keyPair) ? [keyPair] : keyPair;
+        // execute the proof graph generation concurrently
+        const promises: Promise<rdf.DatasetCore>[] = Array.from(keyPairs).map((keypair: KeyPair) => this.generateAProofGraph(toBeSigned, keypair));
+        const retval: rdf.DatasetCore[] = await Promise.all(promises);
+        // return by taking care of overloading.
+        return isKeyPair(keyPair) ? retval[0] : retval;
+    }
+
+
     /**
      * Verify the separate proof graph.
      * 
@@ -297,11 +343,15 @@ abstract class DataIntegrity {
      * @param proofGraph 
      * @returns 
      */
-    async verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore): Promise<boolean> {
+    async verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore): Promise<boolean>;
+    async verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore[]): Promise<boolean[]>;
+    async verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore | rdf.DatasetCore[]): Promise<boolean|boolean[]> {
+        // this is the value that must be checked...
+        const hash = await calculateDatasetHash(dataset);
+
         // Verify the signature by hashing the dataset and check its signature with the key
         // This is the "core"...
         const checkHashValue = async (proof_value: string, key_jwk: JsonWebKey): Promise<boolean> => {
-            const hash = await calculateDatasetHash(dataset);
             const key: CryptoKey = await this.importKey(key_jwk, Confidentiality.public);
             const signature_array: ArrayBuffer = base64UrlToArrayBuffer(proof_value.slice(1));
             const data: ArrayBuffer = textToArrayBuffer(hash);
@@ -319,7 +369,7 @@ abstract class DataIntegrity {
 
         const getProofValue = (store: n3.Store): string => {
             // Retrieve the signature value per spec:
-            const proof_values: rdf.Quad[] = proof.getQuads(null, sec_proofValue, null, null);
+            const proof_values: rdf.Quad[] = store.getQuads(null, sec_proofValue, null, null);
             if (proof_values.length !== 1) {
                 throw new Error("Incorrect proof values");
             }
@@ -327,22 +377,31 @@ abstract class DataIntegrity {
         };
 
         const getPublicKey = (store: n3.Store): JsonWebKey => {
-            const keys: rdf.Quad[] = proof.getQuads(null, sec_publicKeyJwk, null, null);
+            const keys: rdf.Quad[] = store.getQuads(null, sec_publicKeyJwk, null, null);
             if (keys.length !== 1) {
                 throw new Error("Incorrect key values");
             }
             return JSON.parse(keys[0].object.value) as JsonWebKey;
         };
 
-        // Using an n3 store makes subsequent searches easier...
-        const proof: n3.Store = convertToStore(proofGraph);
+        const processOneProofGraph = async (proof_graph: rdf.DatasetCore) : Promise<boolean> => {
+            // Using an n3 store makes subsequent searches easier...
+            const proof: n3.Store = convertToStore(proof_graph);
 
-        const proofValue: string = getProofValue(proof);
-        const publicKey: JsonWebKey = getPublicKey(proof);
+            const proofValue: string = getProofValue(proof);
+            const publicKey: JsonWebKey = getPublicKey(proof);
 
-        // Here we go with checking...
-        const retval: boolean = await checkHashValue(proofValue, publicKey)
-        return retval;
+            // Here we go with checking...
+            const retval: boolean = await checkHashValue(proofValue, publicKey);
+            return retval;
+        }
+
+        const proofs: rdf.DatasetCore[] = isDatasetCore(proofGraph) ? [proofGraph] : proofGraph;
+
+        const promises: Promise<boolean>[] = proofs.map((pr_graph: rdf.DatasetCore) => processOneProofGraph(pr_graph));
+        const results: boolean[] = await Promise.all(promises);
+
+        return isDatasetCore(proofGraph) ? results[0] : results; 
     }
 
     /**
@@ -359,20 +418,43 @@ abstract class DataIntegrity {
      * @param anchor 
      * @returns 
      */
-    async embedProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair, anchor ?: rdf.Quad_Subject): Promise<rdf.DatasetCore> {
-        const retval = convertToStore(dataset);
+    async embedProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair | Iterable<KeyPair>, anchor ?: rdf.Quad_Subject): Promise<rdf.DatasetCore> {
+        const retval: n3.Store = convertToStore(dataset);
 
-        const proofGraphID = retval.createBlankNode();
-        const proofTriples = await this.generateProofGraph(dataset, keyPair);
-        for (const q of proofTriples) {
-            retval.add(quad(q.subject, q.predicate, q.object, proofGraphID));
-        };
+        const keyPairs: KeyPair[] = isKeyPair(keyPair) ? [keyPair] : Array.from(keyPair);
 
-        if (anchor) {
-            const q = quad(anchor, sec_proof, proofGraphID);
-            retval.add(q);
+        const proofGraphs: rdf.DatasetCore[] = await this.generateProofGraph(dataset, keyPairs);
+
+        const key_chain: boolean = keyPairs.length > 1 && Array.isArray(keyPair);
+        const chain: { graph: rdf.BlankNode, proof_id: rdf.Quad_Subject }[] = [];
+
+        for (let i = 0; i < proofGraphs.length; i++) {
+            const proofTriples = proofGraphs[i];
+            const proofGraphID = retval.createBlankNode();
+            for (const q of proofTriples) {
+                retval.add(quad(q.subject, q.predicate, q.object, proofGraphID));
+                if (key_chain && q.predicate.value === rdf_type.value && q.object.value === sec_di_proof.value) {
+                    // Storing the values to create the proof chains in a subsequent step
+                    // The subject is the ID of the proof
+                    chain.push ({
+                        proof_id: q.subject,
+                        graph : proofGraphID,
+                    });
+                }
+            };
+            if (anchor) {
+                const q = quad(anchor, sec_proof, proofGraphID);
+                retval.add(q);
+            }
         }
 
+        // Adding the chain statements, if required
+        if (key_chain) {
+            for (let i = 1; i < chain.length; i++) {
+                const q = quad(chain[i].proof_id, sec_prefix("previousProof"), chain[i - 1].proof_id, chain[i].graph);
+                retval.add(q);
+            }
+        }
         return retval;
     }
 
