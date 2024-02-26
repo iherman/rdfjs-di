@@ -1,0 +1,74 @@
+[
+    {
+        "public": {
+            "key_ops": [
+                "verify"
+            ],
+            "ext": true,
+            "kty": "EC",
+            "x": "LHGayjy__zWhz14u7vWyGbPWkXNdJN1AnhKiQTv3uK8",
+            "y": "9T4ThlFhLi84d3LOaOkvrzLrr_EEczB0sIv3S3vzdd8",
+            "crv": "P-256"
+        },
+        "private": {
+            "key_ops": [
+                "sign"
+            ],
+            "ext": true,
+            "kty": "EC",
+            "x": "LHGayjy__zWhz14u7vWyGbPWkXNdJN1AnhKiQTv3uK8",
+            "y": "9T4ThlFhLi84d3LOaOkvrzLrr_EEczB0sIv3S3vzdd8",
+            "crv": "P-256",
+            "d": "4Gd_JxAFt1zA2kWMyMyRlJcEtyw2eIroUmbXawfT5Ls"
+        },
+        "controller": "https://www.ivan-herman.net/#me"
+    },
+    {
+        "public": {
+            "key_ops": [
+                "verify"
+            ],
+            "ext": true,
+            "kty": "EC",
+            "x": "qtQA8VF1KFsvSfq1BkZP0rODQcQF8x-uL1BXgNcKWIY",
+            "y": "smHmMXIf9FlkY0pbfrZfuCg0BMviSj8IjMhzTPJehLI",
+            "crv": "P-256"
+        },
+        "private": {
+            "key_ops": [
+                "sign"
+            ],
+            "ext": true,
+            "kty": "EC",
+            "x": "qtQA8VF1KFsvSfq1BkZP0rODQcQF8x-uL1BXgNcKWIY",
+            "y": "smHmMXIf9FlkY0pbfrZfuCg0BMviSj8IjMhzTPJehLI",
+            "crv": "P-256",
+            "d": "zPcxJriu3QeQ90c2BFZiSPEWjbles4dB-tgMfGFCERU"
+        },
+        "controller": "https://example.org/key/#alan"
+    },
+    {
+        "public": {
+            "key_ops": [
+                "verify"
+            ],
+            "ext": true,
+            "kty": "EC",
+            "x": "Va-VUJp8w8m4BiaKVxxMaIWjZgf0zaPGvJx0oiaX-ys",
+            "y": "rV7eBS8u4d1eyA7IcNSVoD5C83IdesNMB-gVznJe3uY",
+            "crv": "P-256"
+        },
+        "private": {
+            "key_ops": [
+                "sign"
+            ],
+            "ext": true,
+            "kty": "EC",
+            "x": "Va-VUJp8w8m4BiaKVxxMaIWjZgf0zaPGvJx0oiaX-ys",
+            "y": "rV7eBS8u4d1eyA7IcNSVoD5C83IdesNMB-gVznJe3uY",
+            "crv": "P-256",
+            "d": "Httltx1gWOYBEGgqyCyL8UhhmHc7yZFfVxH_ITUzvxM"
+        },
+        "controller": "https://example.org/key/#jane"
+    }
+]

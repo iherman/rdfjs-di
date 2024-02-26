@@ -16,11 +16,16 @@ enum Confidentiality {
 
 /**
  * Crypto key pair. The keys are stored in JWK format.
- * At the moment, this seems the dominant format for keys in WebCrypto
+ * At the moment, this seems the dominant format for keys in WebCrypto.
+ * 
+ * The values for controller, expires, and revoked, are all optional (see spec for details)
  */
 export interface KeyPair {
-    public: JsonWebKey,
-    private: JsonWebKey,
+    public      : JsonWebKey,
+    private     : JsonWebKey,
+    controller ?: string,
+    expires    ?: string,
+    revoked    ?: string,
 }
 
 /***************************************************************************************
@@ -62,6 +67,7 @@ const sec_proofGraph: rdf.NamedNode   = sec_prefix('ProofGraph');
 const sec_di_proof: rdf.NamedNode     = sec_prefix('DataIntegrityProof');
 const sec_proofValue: rdf.NamedNode   = sec_prefix('proofValue');
 const sec_publicKeyJwk: rdf.NamedNode = sec_prefix('publicKeyJwk');
+const xsd_datetime: rdf.NamedNode     = xsd_prefix('dateTime');
 
 
 /*****************************************************************************************
@@ -217,7 +223,7 @@ abstract class DataIntegrity {
      * @param keyPair 
      * @returns 
      */
-    async generateProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair, controller ?: string): Promise<rdf.DatasetCore> {
+    async generateProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair | Iterable<KeyPair>): Promise<rdf.DatasetCore> {
         // Calculate the hash of the dataset, and sign the hash with the secret key
         // This is the "core"...
         const signHashValue = async (): Promise<string> => {
@@ -253,7 +259,7 @@ abstract class DataIntegrity {
                     proofGraph, sec_prefix('cryptosuite'), literal(this._cryptosuite)
                 ),
                 quad(
-                    proofGraph, sec_prefix('created'), literal((new Date()).toISOString(),xsd_prefix('dateTime'))
+                    proofGraph, sec_prefix('created'), literal((new Date()).toISOString(), xsd_datetime)
                 ),
                 quad(
                     proofGraph, sec_prefix('verificationMethod'), keyGraph
@@ -272,7 +278,9 @@ abstract class DataIntegrity {
                     keyGraph, sec_publicKeyJwk, literal(JSON.stringify(keyPair.public), rdf_prefix('JSON'))
                 ),
             ]);
-            if (controller) retval.add(quad(keyGraph, sec_prefix('controller'), namedNode(controller)))
+            if (keyPair.controller) retval.add(quad(keyGraph, sec_prefix('controller'), namedNode(keyPair.controller)));
+            if (keyPair.expires) retval.add(quad(keyGraph, sec_prefix('expires'), literal(keyPair.expires, xsd_datetime)));
+            if (keyPair.revoked) retval.add(quad(keyGraph, sec_prefix('revoked'), literal(keyPair.revoked, xsd_datetime)));
             return retval;
         };
 
@@ -351,11 +359,11 @@ abstract class DataIntegrity {
      * @param anchor 
      * @returns 
      */
-    async embedProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair, controller ?: string, anchor ?: rdf.Quad_Subject): Promise<rdf.DatasetCore> {
+    async embedProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair, anchor ?: rdf.Quad_Subject): Promise<rdf.DatasetCore> {
         const retval = convertToStore(dataset);
 
         const proofGraphID = retval.createBlankNode();
-        const proofTriples = await this.generateProofGraph(dataset, keyPair, controller);
+        const proofTriples = await this.generateProofGraph(dataset, keyPair);
         for (const q of proofTriples) {
             retval.add(quad(q.subject, q.predicate, q.object, proofGraphID));
         };

@@ -22,6 +22,7 @@
   ],
   "dependencies": {
     "@rdfjs/types": "^1.1.0",
+    "@tufjs/canonical-json": "^2.0.0",
     "base64url": "^3.0.1",
     "n3": "^1.17.2",
     "rdfjs-c14n": "file:../../RCH/rdfjs-c14n",
