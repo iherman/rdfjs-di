@@ -162,7 +162,7 @@ export function arrayBufferToBase64Url(arrayBuffer: ArrayBuffer): string {
  * 
  * (Created with the help of chatgpt...)
  * 
- * @param string 
+ * @param url 
  * @returns 
  */
 export function base64UrlToArrayBuffer(url: string): ArrayBuffer {

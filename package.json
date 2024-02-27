@@ -4,7 +4,9 @@
   "description": "Data Integrity used to secure an RDF Dataset",
   "main": "index.js",
   "scripts": {
-    "test": "./node_modules/.bin/ts-node testing/run/main.ts"
+    "test": "./node_modules/.bin/ts-node testing/run/main.ts",
+    "docs": "./node_modules/.bin/typedoc index.ts lib/*",
+    "dist": "tsc"
   },
   "repository": {
     "type": "git",
@@ -28,16 +30,18 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@tufjs/canonical-json": "^2.0.0",
     "@types/n3": "^1.16.4",
     "@types/node": "^20.11.19",
     "@types/uuid": "^9.0.8",
     "@typescript-eslint/eslint-plugin": "^7.0.1",
     "@typescript-eslint/parser": "^7.0.1",
-    "@tufjs/canonical-json": "^2.0.0",
     "commander": "^12.0.0",
     "eslint": "^8.56.0",
     "ts-node": "^10.9.2",
     "typedoc": "^0.25.8",
+    "typedoc-material-theme": "^1.0.2",
+    "typedoc-theme-hierarchy": "^4.1.2",
     "typescript": "^5.3.3"
   }
 }

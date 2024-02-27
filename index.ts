@@ -11,7 +11,7 @@ import {
 const { namedNode, literal, quad } = n3.DataFactory;
 
 /** Values used internally for the crypto functions; they are defined by the WebCrypto spec. */
-enum Confidentiality {
+export enum Confidentiality {
     public = "public",
     secret = "secret"
 }
