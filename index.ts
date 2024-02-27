@@ -3,12 +3,8 @@ import * as rdf       from '@rdfjs/types';
 import * as n3        from 'n3';
 import { v4 as uuid } from 'uuid';
 import {
-    createPrefix, 
-    isDatasetCore, 
+    createPrefix, isDatasetCore, convertToStore, DatasetMap,
     textToArrayBuffer, calculateDatasetHash, arrayBufferToBase64Url, base64UrlToArrayBuffer,
-    copyToStore, convertToStore,
-    DatasetMap,
-    write_quads
  }  from './lib/utils';
 
 // n3.DataFactory is a namespace with some functions...
@@ -45,7 +41,7 @@ function isKeyPair(obj: any): obj is KeyPair {
 }
 
 /***************************************************************************************
- * Namespace handling
+ * Namespaces and specific terms that are used several times
  **************************************************************************************/
 
 /* Various namespaces, necessary when constructing a proof graph */
@@ -64,9 +60,7 @@ const xsd_datetime: rdf.NamedNode     = xsd_prefix('dateTime');
 
 
 /*****************************************************************************************
- * 
  * The real meat...
- * 
  *****************************************************************************************/
 
 /**
@@ -83,13 +77,16 @@ abstract class DataIntegrity {
         this._hash = "SHA-256";
     }
 
-    get algorithm(): string { return this._algorithm }
-    get cryptosuite(): string { return this._cryptosuite; }
-    get hash(): string { return this._hash; }
-    get curve(): string { return this._curve; }
+    // get algorithm(): string { return this._algorithm }
+    // get cryptosuite(): string { return this._cryptosuite; }
+    // get hash(): string { return this._hash; }
+    // get curve(): string { return this._curve; }
 
+    /**************************************************************************************************/
+    /* Internal functions. All of them are protected, ie, usable by the concrete subclasses           */
+    /**************************************************************************************************/
     /**
-     * Import a JWK encoded key into a key usable for crypto.subtle.
+     * Import a JWK encoded key into a key usable by crypto.subtle.
      * 
      * @param key - the key itself 
      * @param type - whether this is a private or public key (usable to sign or verify, respectively)
@@ -179,7 +176,6 @@ abstract class DataIntegrity {
             if (keyPair.revoked) retval.add(quad(keyGraph, sec_prefix('revoked'), literal(keyPair.revoked, xsd_datetime)));
             return retval;
         };
-
         return createProofGraph(await signHashValue());
     }
 
@@ -190,7 +186,7 @@ abstract class DataIntegrity {
      * @param proof 
      * @returns 
      */
-    protected async processOneProofGraph(hash: string, proof: n3.Store): Promise<boolean> {
+    protected async validateProofGraph(hash: string, proof: n3.Store): Promise<boolean> {
         // Verify the signature by check signature of the hash with the key
         // This is the "core"...
         const checkHashValue = async (proof_value: string, key_jwk: JsonWebKey): Promise<boolean> => {
@@ -280,7 +276,7 @@ abstract class DataIntegrity {
         const proofs: rdf.DatasetCore[] = isDatasetCore(proofGraph) ? [proofGraph] : proofGraph;
 
         // the "convertToStore" intermediate step is necessary; the proof graph checker needs a n3.Store
-        const promises: Promise<boolean>[] = proofs.map(convertToStore).map((pr_graph: n3.Store): Promise<boolean> => this.processOneProofGraph(hash,pr_graph));
+        const promises: Promise<boolean>[] = proofs.map(convertToStore).map((pr_graph: n3.Store): Promise<boolean> => this.validateProofGraph(hash,pr_graph));
         const results: boolean[] = await Promise.all(promises);
 
         return isDatasetCore(proofGraph) ? results[0] : results; 
@@ -294,9 +290,12 @@ abstract class DataIntegrity {
      * will be the subject, otherwise a new blank node. (The latter may be meaningless, but makes it easier
      * to find the proof graph for verification.)
      * 
+     * If the `keyPair` argument is an Array, then the proof graphs are considered to be a Proof Chain. Otherwise,
+     * (e.g., if it is a Set), it is a Proof Set.
+     * 
      * Just wrapper around {@link generateProofGraph}.
      * @param dataset 
-     * @param keyPair 
+     * @param keyPair
      * @param anchor 
      * @returns 
      */
@@ -307,19 +306,19 @@ abstract class DataIntegrity {
 
         const proofGraphs: rdf.DatasetCore[] = await this.generateProofGraph(dataset, keyPairs);
 
-        const key_chain: boolean = keyPairs.length > 1 && Array.isArray(keyPair);
-        const chain: { graph: rdf.BlankNode, proof_id: rdf.Quad_Subject }[] = [];
+        const isKeyChain: boolean = keyPairs.length > 1 && Array.isArray(keyPair);
+        const chain: { graph: rdf.BlankNode, proofId: rdf.Quad_Subject }[] = [];
 
         for (let i = 0; i < proofGraphs.length; i++) {
             const proofTriples = proofGraphs[i];
             const proofGraphID = retval.createBlankNode();
             for (const q of proofTriples) {
                 retval.add(quad(q.subject, q.predicate, q.object, proofGraphID));
-                if (key_chain && q.predicate.value === rdf_type.value && q.object.value === sec_di_proof.value) {
+                if (isKeyChain && q.predicate.value === rdf_type.value && q.object.value === sec_di_proof.value) {
                     // Storing the values to create the proof chains in a subsequent step
                     // The subject is the ID of the proof
                     chain.push ({
-                        proof_id: q.subject,
+                        proofId: q.subject,
                         graph : proofGraphID,
                     });
                 }
@@ -331,9 +330,9 @@ abstract class DataIntegrity {
         }
 
         // Adding the chain statements, if required
-        if (key_chain) {
+        if (isKeyChain) {
             for (let i = 1; i < chain.length; i++) {
-                const q = quad(chain[i].proof_id, sec_prefix("previousProof"), chain[i - 1].proof_id, chain[i].graph);
+                const q = quad(chain[i].proofId, sec_prefix("previousProof"), chain[i - 1].proofId, chain[i].graph);
                 retval.add(q);
             }
         }
@@ -378,7 +377,7 @@ abstract class DataIntegrity {
                 dataStore.add(q)
             } else if(proofGraphs.has(q.graph)) {
                 // this quad belongs to a proof graph!
-                // Note that the proof graphs contain only triples, they are 
+                // Note that the proof graphs contain only triples, because they are 
                 // separate entities now...
                 proofGraphs.item(q.graph).add(quad(q.subject, q.predicate, q.object));
             } else {
@@ -390,11 +389,8 @@ abstract class DataIntegrity {
         const hash = await calculateDatasetHash(dataStore);
 
         const proofs: n3.Store[] = proofGraphs.datasets(); 
-        // the "convertToStore" intermediate step is necessary; the proof graph checker needs a n3.Store
-        const promises: Promise<boolean>[] = proofs.map((pr_graph: n3.Store): Promise<boolean> => this.processOneProofGraph(hash, pr_graph));
+        const promises: Promise<boolean>[] = proofs.map((prGraph: n3.Store): Promise<boolean> => this.validateProofGraph(hash, prGraph));
         const results: boolean[] = await Promise.all(promises);
-
-        console.log(results)
 
         return !results.includes(false);
     };

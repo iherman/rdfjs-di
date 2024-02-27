@@ -1,14 +1,27 @@
+/**
+ * Collection of smaller utilities needed for the DI implementation. Put into a separate file for an easier maintenance; not meant
+ * to be part of the external API
+ */
+
 import { RDFC10 } from 'rdfjs-c14n';
-import base64url from 'base64url';
-import * as rdf from '@rdfjs/types';
-import * as n3 from 'n3';
-import { v4 as uuid } from 'uuid';
+import base64url  from 'base64url';
+import * as rdf   from '@rdfjs/types';
+import * as n3    from 'n3';
 const { namedNode, literal, quad } = n3.DataFactory;
 
 /***************************************************************************************
  * Namespace handling
  **************************************************************************************/
 
+/**
+ * A simple namespace handler; I was not sure I fully understood the n3 version, and 
+ * I found no reliable documentation (...)
+ * 
+ * This function returns a function that can be used to generate a proper URI for a given prefix.
+ * 
+ * @param uri 
+ * @returns 
+ */
 export function createPrefix(uri: string): (l: string) => rdf.NamedNode {
     class prefix {
         private _mapping: Record<string, rdf.NamedNode> = {};
@@ -33,8 +46,61 @@ export function createPrefix(uri: string): (l: string) => rdf.NamedNode {
     return get_value;
 }
 
+/***************************************************************************************
+ * Map to help separating the content of a dataset into several different datasets.
+ * Needed to separate the proof graphs from the "real" data
+ **************************************************************************************/
+
+interface MapContent {
+    id      : rdf.Quad_Graph,
+    dataset : n3.Store;
+}
+
+/**
+ * A shell around a Map, which is indexed by the *value* of rdf Terms.
+ * 
+ * (At the moment, the map value is a structure, that also includes
+ * the original term; that may become unnecessary on long term.)
+ */
+export class DatasetMap {
+    private index: Map<string, MapContent>;
+
+    constructor() {
+        this.index = new Map();
+    }
+
+    /**
+     * Create a new dataset, if needed, otherwise returns the
+     * dataset already stored.
+     * 
+     * @param graph 
+     * @returns 
+     */
+    item(graph: rdf.Quad_Graph): n3.Store {
+        if (this.index.has(graph.value)) {
+            return this.index.get(graph.value).dataset;
+        } else {
+            const dataset = new n3.Store();
+            this.index.set(graph.value, {
+                id: graph,
+                dataset
+            });
+            return dataset;
+        }
+    }
+
+    has(graph: rdf.Term): boolean {
+        return this.index.has(graph.value);
+    }
+
+    datasets(): n3.Store[] {
+        return Array.from(this.index.values()).map((entry) => entry.dataset);
+    }
+}
+
+
 /*****************************************************************************************
- * Utility Functions
+ * Misc Utility Functions
  *****************************************************************************************/
 
 /**
@@ -59,8 +125,7 @@ export function textToArrayBuffer(text: string): ArrayBuffer {
 }
 
 /**
- * Calculate the canonical hash of a dataset; this is based on the
- * implementation of RDFC 1.0
+ * Calculate the canonical hash of a dataset using the implementation of RDFC 1.0.
  * 
  * @param dataset 
  * @returns 
@@ -72,9 +137,8 @@ export async function calculateDatasetHash(dataset: rdf.DatasetCore): Promise<st
     return datasetHash;
 }
 
-
 /**
- * Convert an array buffer to base64url value.
+ * Convert an array buffer to a base64url value.
  * 
  * (Created with the help of chatgpt...)
  * 
@@ -116,15 +180,16 @@ export function base64UrlToArrayBuffer(url: string): ArrayBuffer {
 
 
 /**
- * Create and store the values in a dataset into a new n3 Store. This may be
- * necessary, because the methods are not supposed to modify the original
+ * Create and store the values in a dataset in a new n3 Store. This may be
+ * necessary because the methods are not supposed to modify the original
  * dataset.
  * 
- * The n3.Store objects includes functions to retrieve quads.
+ * The n3.Store objects includes functions to retrieve quads, which is a great plus
+ * 
  * @param dataset 
  * @returns 
  */
-export function copyToStore(dataset: rdf.DatasetCore): n3.Store {
+function copyToStore(dataset: rdf.DatasetCore): n3.Store {
     const retval = new n3.Store();
     for (const q of dataset) retval.add(q);
     return retval;
@@ -140,42 +205,6 @@ export function copyToStore(dataset: rdf.DatasetCore): n3.Store {
 export function convertToStore(dataset: rdf.DatasetCore): n3.Store {
     return (dataset instanceof n3.Store) ? dataset : copyToStore(dataset);
 }
-
-
-interface MapContent {
-    id      : rdf.Quad_Graph,
-    dataset : n3.Store
-}
-
-export class DatasetMap {
-    private index: Map<string, MapContent>;
-
-    constructor() {
-        this.index = new Map();
-    }
-
-    item(graph: rdf.Quad_Graph): n3.Store {
-        if (this.index.has(graph.value)) {
-            return this.index.get(graph.value).dataset
-        } else {
-            const dataset = new n3.Store();
-            this.index.set(graph.value, {
-                id      : graph,
-                dataset
-            });
-            return dataset
-        }
-    }
-
-    has(graph: rdf.Term): boolean {
-        return this.index.has(graph.value)
-    }
-
-    datasets(): n3.Store[] {
-        return Array.from(this.index.values()).map((entry) => entry.dataset);
-    }
-}
-
 
 /*****************************************************************************************
  * This is only used for debugging!!!!
