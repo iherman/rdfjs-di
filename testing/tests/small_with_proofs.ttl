@@ -1,0 +1,86 @@
+@prefix sec: <https://w3id.org/security#>.
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns>.
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix dc: <http://purl.org/dc/terms/>.
+@prefix foaf: <http://xmlns.com/foaf/0.1/>.
+@prefix doap: <http://usefulinc.com/ns/doap#>.
+@prefix earl: <http://www.w3.org/ns/earl#>.
+
+<file:///small.ttl> foaf:primaryTopic <https://iherman.github.io/rdfjs-c14n/>;
+    dc:issued "2024-02-14T13:21:08.700Z"^^xsd:dateTime;
+    foaf:maker <https://www.ivan-herman.net/foaf#me>;
+    sec:proof _:b0, _:b1, _:b2.
+
+<https://iherman.github.io/rdfjs-c14n/> foaf:maker <https://www.ivan-herman.net/foaf#me>;
+    a doap:Project;
+    doap:name "rdfjs-c14n";
+    doap:homepage <https://iherman.github.io/rdfjs-c14n/>;
+    doap:license <https://www.w3.org/Consortium/Legal/copyright-software>;
+    doap:shortdesc "RDF Canonicalization in TypeScript."@en;
+    doap:description "Implementation in Typescript of the RDF Canonicalization Algorithm RDFC-1.0, on top of the RDF/JS interfaces"@en;
+    doap:created "2023-01-05"^^xsd:date;
+    doap:programming-language "TypeScript";
+    doap:implements <https://www.w3.org/TR/rdf-canon/>;
+    doap:category <http://dbpedia.org/resource/Resource_Description_Framework>, <http://dbpedia.org/resource/TypeScript>;
+    doap:download-page <https://www.npmjs.com/package/rdfjs-c14n>;
+    doap:bug-database <https://github.com/iherman/rdfjs-c14n/issues>;
+    doap:developer <https://www.ivan-herman.net/foaf#me>;
+    doap:maintainer <https://www.ivan-herman.net/foaf#me>;
+    doap:documenter <https://www.ivan-herman.net/foaf#me>;
+    dc:creator <https://www.ivan-herman.net/foaf#me>;
+    doap:release _:n3-0;
+    doap:repository _:n3-1.
+
+<https://www.ivan-herman.net/foaf#me> a foaf:Person, earl:Assertor;
+    foaf:name "Ivan Herman";
+    foaf:title "Implementor";
+    foaf:homepage <https://www.ivan-herman.net/>.
+
+_:n3-0 a doap:Version;
+    doap:name "rdfjs-c14n";
+    doap:created "2024-02-07"^^xsd:date;
+    doap:revision "3.1.0".
+
+_:n3-1 a doap:GitRepository;
+    doap:location <https://github.com/iherman/rdfjs-c14n>.
+
+_:b0 {
+    <urn:uuid:8522eed3-f16a-4394-a573-2f38e4d57a2b> a sec:DataIntegrityProof;
+        sec:cryptosuite "ecdsa-2022";
+        sec:created "2024-02-27T14:26:37.928Z"^^xsd:dateTime;
+        sec:verificationMethod <urn:uuid:deb66bfd-9bf2-4bba-9283-a4d1fa1e28dc>;
+        sec:proofValue "uyT3-XGBLlWNmFtkW0u6Hs_iqARi4VhXr2WswK6C-I2lMEs8gHxP7kCIaUnSLS6ptt5KBmI5hZXWzb-TxQ0uaMQ";
+        sec:proofPurpose sec:authenticationMethod.
+    <urn:uuid:deb66bfd-9bf2-4bba-9283-a4d1fa1e28dc> a sec:JsonWebKey;
+        sec:publicKeyJwk "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"LHGayjy__zWhz14u7vWyGbPWkXNdJN1AnhKiQTv3uK8\",\"y\":\"9T4ThlFhLi84d3LOaOkvrzLrr_EEczB0sIv3S3vzdd8\",\"crv\":\"P-256\"}"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON>;
+        sec:controller <https://www.ivan-herman.net/#me>;
+        sec:expires "2055-02-24T00:00:00Z"^^xsd:dateTime
+}
+
+_:b1 {
+    <urn:uuid:f869d972-a0b6-4979-96da-768468fbb059> a sec:DataIntegrityProof;
+        sec:cryptosuite "ecdsa-2022";
+        sec:created "2024-02-27T14:26:37.929Z"^^xsd:dateTime;
+        sec:verificationMethod <urn:uuid:6d64c882-f321-4ada-9629-f3fe7d2b622d>;
+        sec:proofValue "uejeL3giQd5cdZbP-b6f5A1RVpi6k7ofP4xnUL8r4I42tiiqbsw1Y-dn70OwcLUYepQQTxC0LtsjXO0cvR0lwQA";
+        sec:proofPurpose sec:authenticationMethod;
+        sec:previousProof <urn:uuid:8522eed3-f16a-4394-a573-2f38e4d57a2b>.
+    <urn:uuid:6d64c882-f321-4ada-9629-f3fe7d2b622d> a sec:JsonWebKey;
+        sec:publicKeyJwk "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"qtQA8VF1KFsvSfq1BkZP0rODQcQF8x-uL1BXgNcKWIY\",\"y\":\"smHmMXIf9FlkY0pbfrZfuCg0BMviSj8IjMhzTPJehLI\",\"crv\":\"P-256\"}"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON>;
+        sec:controller <https://example.org/key/#alan>
+}
+
+_:b2 {
+    <urn:uuid:c7560a5f-2d97-48d9-95b7-942fe705753e> a sec:DataIntegrityProof;
+        sec:cryptosuite "ecdsa-2022";
+        sec:created "2024-02-27T14:26:37.929Z"^^xsd:dateTime;
+        sec:verificationMethod <urn:uuid:416cff11-2232-4ff4-9466-cff416a08fa7>;
+        sec:proofValue "uJP_kCAZKqlT4YhiKcaV6OcbfXWvrAhwZeANrspwf8LL3VrvUsmUDzfU9NUcdMalWRduXlK9l__uas7_UHR9RKQ";
+        sec:proofPurpose sec:authenticationMethod;
+        sec:previousProof <urn:uuid:f869d972-a0b6-4979-96da-768468fbb059>.
+    <urn:uuid:416cff11-2232-4ff4-9466-cff416a08fa7> a sec:JsonWebKey;
+        sec:publicKeyJwk "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"Va-VUJp8w8m4BiaKVxxMaIWjZgf0zaPGvJx0oiaX-ys\",\"y\":\"rV7eBS8u4d1eyA7IcNSVoD5C83IdesNMB-gVznJe3uY\",\"crv\":\"P-256\"}"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON>;
+        sec:controller <https://example.org/key/#jane>
+}
+
