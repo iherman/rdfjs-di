@@ -2,8 +2,14 @@
 import * as rdf       from '@rdfjs/types';
 import * as n3        from 'n3';
 import { v4 as uuid } from 'uuid';
-import { RDFC10 }     from 'rdfjs-c14n';
-import base64url      from 'base64url';
+import {
+    createPrefix, 
+    isDatasetCore, 
+    textToArrayBuffer, calculateDatasetHash, arrayBufferToBase64Url, base64UrlToArrayBuffer,
+    copyToStore, convertToStore,
+    DatasetMap,
+    write_quads
+ }  from './lib/utils';
 
 // n3.DataFactory is a namespace with some functions...
 const { namedNode, literal, quad } = n3.DataFactory;
@@ -42,30 +48,6 @@ function isKeyPair(obj: any): obj is KeyPair {
  * Namespace handling
  **************************************************************************************/
 
-function createPrefix(uri: string): (l: string) => rdf.NamedNode {
-    class prefix {
-        private _mapping: Record<string, rdf.NamedNode> = {};
-        private _base: string;
-        constructor(base: string) {
-            this._base = base;
-        }
-        value(local: string): rdf.NamedNode {
-            if (local in this._mapping) {
-                return this._mapping[local];
-            } else {
-                const retval: rdf.NamedNode = namedNode(`${this._base}${local}`);
-                this._mapping[local] = retval;
-                return retval;
-            }
-        }
-    }
-    const mapping = new prefix(uri);
-    const get_value = (local: string): rdf.NamedNode => {
-        return mapping.value(local);
-    };
-    return get_value;
-}
-
 /* Various namespaces, necessary when constructing a proof graph */
 const sec_prefix = createPrefix("https://w3id.org/security#");
 const rdf_prefix = createPrefix("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
@@ -80,112 +62,6 @@ const sec_publicKeyJwk: rdf.NamedNode = sec_prefix('publicKeyJwk');
 const xsd_datetime: rdf.NamedNode     = xsd_prefix('dateTime');
 
 
-/*****************************************************************************************
- * Utility Functions
- *****************************************************************************************/
-
-/**
- * Type guard to check if an object implements the rdf.DatasetCore interface.
- * 
- * @param obj 
- * @returns 
- */
-function isDatasetCore(obj: any): obj is rdf.DatasetCore {
-    return  (obj as rdf.DatasetCore).add !== undefined && 
-            (obj as rdf.DatasetCore).delete !== undefined &&
-            (obj as rdf.DatasetCore).match !== undefined &&
-            (obj as rdf.DatasetCore).has !== undefined;
-}
-
-/**
- * Text to array buffer, needed for crypto operations
- * @param text
- */
-function textToArrayBuffer(text: string): ArrayBuffer {
-    return (new TextEncoder()).encode(text).buffer;
-}
-
-/**
- * Calculate the canonical hash of a dataset; this is based on the
- * implementation of RDFC 1.0
- * 
- * @param dataset 
- * @returns 
- */
-async function calculateDatasetHash(dataset: rdf.DatasetCore): Promise<string> {
-    const rdfc10 = new RDFC10();
-    const canonical_quads: string = await rdfc10.canonicalize(dataset);
-    const datasetHash: string = await rdfc10.hash(canonical_quads);
-    return datasetHash;
-}
-
-
-/**
- * Convert an array buffer to base64url value.
- * 
- * (Created with the help of chatgpt...)
- * 
- * @param arrayBuffer 
- * @returns 
- */
-function arrayBufferToBase64Url(arrayBuffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(arrayBuffer);
-
-    let binary: string = "";
-    for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    const base64String = btoa(binary);
-
-    return base64url.fromBase64(base64String);
-}
-
-/**
- * Convert a base64url value to an array buffer
- * 
- * (Created with the help of chatgpt...)
- * 
- * @param string 
- * @returns 
- */
-function base64UrlToArrayBuffer(url: string): ArrayBuffer {
-    const base64string = base64url.toBase64(url);
-
-    const binary = atob(base64string);
-
-    const byteArray = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        byteArray[i] = binary.charCodeAt(i);
-    }
-
-    return byteArray.buffer;
-}
-
-/**
- * Create and store the values in a dataset into a new n3 Store. This may be
- * necessary, because the methods are not supposed to modify the original
- * dataset.
- * 
- * The n3.Store objects includes functions to retrieve quads.
- * @param dataset 
- * @returns 
- */
-function copyToStore(dataset: rdf.DatasetCore): n3.Store {
-    const retval = new n3.Store();
-    for (const q of dataset) retval.add(q);
-    return retval;
-}
-
-/**
- * Convert the dataset into an n3.Store, unless it is already a store.
- * This is done to manage the various quads more efficiently.
- * 
- * @param dataset 
- * @returns 
- */
-function convertToStore(dataset: rdf.DatasetCore): n3.Store {
-    return (dataset instanceof n3.Store) ? dataset : copyToStore(dataset);
-}
 
 /*****************************************************************************************
  * 
@@ -307,6 +183,57 @@ abstract class DataIntegrity {
         return createProofGraph(await signHashValue());
     }
 
+    /**
+     * Check one proof graph, ie, whether the included signature corresponds to the hash value
+     * 
+     * @param hash 
+     * @param proof 
+     * @returns 
+     */
+    protected async processOneProofGraph(hash: string, proof: n3.Store): Promise<boolean> {
+        // Verify the signature by check signature of the hash with the key
+        // This is the "core"...
+        const checkHashValue = async (proof_value: string, key_jwk: JsonWebKey): Promise<boolean> => {
+            const key: CryptoKey = await this.importKey(key_jwk, Confidentiality.public);
+            const signature_array: ArrayBuffer = base64UrlToArrayBuffer(proof_value.slice(1));
+            const data: ArrayBuffer = textToArrayBuffer(hash);
+            const retval: boolean = await crypto.subtle.verify(
+                {
+                    name: this._algorithm,
+                    hash: this._hash
+                },
+                key,
+                signature_array,
+                data
+            );
+            return retval;
+        };
+
+        const getProofValue = (store: n3.Store): string => {
+            // Retrieve the signature value per spec:
+            const proof_values: rdf.Quad[] = store.getQuads(null, sec_proofValue, null, null);
+            if (proof_values.length !== 1) {
+                throw new Error("Incorrect proof values");
+            }
+            return proof_values[0].object.value;
+        };
+
+        const getPublicKey = (store: n3.Store): JsonWebKey => {
+            const keys: rdf.Quad[] = store.getQuads(null, sec_publicKeyJwk, null, null);
+            if (keys.length !== 1) {
+                throw new Error("Incorrect key values");
+            }
+            return JSON.parse(keys[0].object.value) as JsonWebKey;
+        };
+
+        const proofValue: string = getProofValue(proof);
+        const publicKey: JsonWebKey = getPublicKey(proof);
+
+        // Here we go with checking...
+        const retval: boolean = await checkHashValue(proofValue, publicKey);
+        return retval;
+    }
+
 
     /**
      * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in 
@@ -349,56 +276,11 @@ abstract class DataIntegrity {
         // this is the value that must be checked...
         const hash = await calculateDatasetHash(dataset);
 
-        // Verify the signature by hashing the dataset and check its signature with the key
-        // This is the "core"...
-        const checkHashValue = async (proof_value: string, key_jwk: JsonWebKey): Promise<boolean> => {
-            const key: CryptoKey = await this.importKey(key_jwk, Confidentiality.public);
-            const signature_array: ArrayBuffer = base64UrlToArrayBuffer(proof_value.slice(1));
-            const data: ArrayBuffer = textToArrayBuffer(hash);
-            const retval: boolean = await crypto.subtle.verify(
-                {
-                    name: this._algorithm,
-                    hash: this._hash
-                },
-                key, 
-                signature_array, 
-                data
-            );
-            return retval;
-        };
-
-        const getProofValue = (store: n3.Store): string => {
-            // Retrieve the signature value per spec:
-            const proof_values: rdf.Quad[] = store.getQuads(null, sec_proofValue, null, null);
-            if (proof_values.length !== 1) {
-                throw new Error("Incorrect proof values");
-            }
-            return proof_values[0].object.value;
-        };
-
-        const getPublicKey = (store: n3.Store): JsonWebKey => {
-            const keys: rdf.Quad[] = store.getQuads(null, sec_publicKeyJwk, null, null);
-            if (keys.length !== 1) {
-                throw new Error("Incorrect key values");
-            }
-            return JSON.parse(keys[0].object.value) as JsonWebKey;
-        };
-
-        const processOneProofGraph = async (proof_graph: rdf.DatasetCore) : Promise<boolean> => {
-            // Using an n3 store makes subsequent searches easier...
-            const proof: n3.Store = convertToStore(proof_graph);
-
-            const proofValue: string = getProofValue(proof);
-            const publicKey: JsonWebKey = getPublicKey(proof);
-
-            // Here we go with checking...
-            const retval: boolean = await checkHashValue(proofValue, publicKey);
-            return retval;
-        }
-
+        // just to make the handling uniform...
         const proofs: rdf.DatasetCore[] = isDatasetCore(proofGraph) ? [proofGraph] : proofGraph;
 
-        const promises: Promise<boolean>[] = proofs.map((pr_graph: rdf.DatasetCore) => processOneProofGraph(pr_graph));
+        // the "convertToStore" intermediate step is necessary; the proof graph checker needs a n3.Store
+        const promises: Promise<boolean>[] = proofs.map(convertToStore).map((pr_graph: n3.Store): Promise<boolean> => this.processOneProofGraph(hash,pr_graph));
         const results: boolean[] = await Promise.all(promises);
 
         return isDatasetCore(proofGraph) ? results[0] : results; 
@@ -458,42 +340,64 @@ abstract class DataIntegrity {
         return retval;
     }
 
+    /**
+     * Verify the dataset with embedded proof graphs. The individual proof graphs are identified by the presence
+     * of a type relationship to `DataIntegrityProof`; the result is the conjunction of the validation result for
+     * each proof graphs separately.
+     * 
+     * @param dataset 
+     * @returns 
+     */
     async verifyEmbeddedProofGraph(dataset: rdf.DatasetCore): Promise<boolean> {
-        const datasetStore: n3.Store = convertToStore(dataset);
-        const getProofGraphID = (): rdf.Term => {
-            const statements: rdf.Quad[] = datasetStore.getQuads(null, sec_proof, null, null);
-            if (statements.length > 1) {
-                throw new Error(`Ambiguous proof graph ID`);
-            } else if( statements.length === 0) {
-                const alt_statements: rdf.Quad[] = datasetStore.getQuads(null, rdf_type, sec_di_proof, null);
-                if( alt_statements.length === 0 ) {
-                    throw new Error(`Non existent proof graph ID`);
-                } else if (alt_statements.length >1 ) {
-                    throw new Error(`Ambiguous proof graph ID`);
+        const dataStore   = new n3.Store();
+        const proofGraphs = new DatasetMap();
+
+        // Separate the core data from the datasets;
+        // First, identify the possible dataset graph IDs
+        for (const q of dataset) {
+            // A dataset can be identified with a proof property.
+            if (q.predicate.equals(sec_proof)) {
+                // the object refers to a proof graph (unless it is a literal, which is a bug!)
+                if (q.object.termType !== "Literal") {
+                    proofGraphs.item(q.object as rdf.Quad_Graph);
                 }
-                return alt_statements[0].graph;
-            }
-            return statements[0].object;
-        } 
-
-        const proofGraph = new n3.Store();
-        const signedGraph = new n3.Store();
-        const proofGraphID: rdf.Term = getProofGraphID();
-
-        for (const q of datasetStore) {
-            if (q.graph.equals(proofGraphID)) {
-                proofGraph.add(quad(q.subject,q.predicate,q.object));
-            } else if (q.object.equals(sec_proofGraph)) {
-                continue;
-            } else if (q.predicate.equals(sec_proof)) {
-                continue;
-            } else {
-                signedGraph.add(q);
+                // The quad is not copied to the dataStore!
+            } else if (q.predicate.equals(rdf_type) && q.object.equals(sec_di_proof)) {
+                // the triple is in a proof graph!
+                proofGraphs.item(q.graph);
             }
         }
-        return await this.verifyProofGraph(signedGraph, proofGraph);
-    };
 
+        // By now, we got the identification of all the proof graphs, we can separate the quads among 
+        // the data graph and the relevant proof graphs
+        for (const q of dataset) {
+            if (q.predicate.equals(sec_proof)) {
+                // this is an extra entry, not part of the triples that were signed
+                continue;
+            } else if(q.graph.termType === "DefaultGraph") {
+                dataStore.add(q)
+            } else if(proofGraphs.has(q.graph)) {
+                // this quad belongs to a proof graph!
+                // Note that the proof graphs contain only triples, they are 
+                // separate entities now...
+                proofGraphs.item(q.graph).add(quad(q.subject, q.predicate, q.object));
+            } else {
+                // This a bona fide data quad
+                dataStore.add(q);
+            }
+        }
+
+        const hash = await calculateDatasetHash(dataStore);
+
+        const proofs: n3.Store[] = proofGraphs.datasets(); 
+        // the "convertToStore" intermediate step is necessary; the proof graph checker needs a n3.Store
+        const promises: Promise<boolean>[] = proofs.map((pr_graph: n3.Store): Promise<boolean> => this.processOneProofGraph(hash, pr_graph));
+        const results: boolean[] = await Promise.all(promises);
+
+        console.log(results)
+
+        return !results.includes(false);
+    };
 }
 
 /**

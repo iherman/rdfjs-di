@@ -39,19 +39,20 @@ async function main() {
     const di_ecdsa = new DI_ECDSA();
 
     if (proof_set || proof_chain) {
-        let proofs: rdf.DatasetCore[] = [];
         const finalKeyPairs = proof_chain ? keyPairs : new OSet<KeyPair>(keyPairs);
 
         let results: boolean[] = [false];
         if (embed) {
-            if (!quiet) console.log(`>>> Generating embedded proofs for "${input}", with anchor at "${JSON.stringify(anchor, null, 2)}"\n`);
-            proofs = [await di_ecdsa.embedProofGraph(dataset, finalKeyPairs, anchor)];
+            if (!quiet) console.log(`>>> Generating embedded proofs for "${input}", with anchor at "${JSON.stringify(anchor)}"\n`);
+            const proof = await di_ecdsa.embedProofGraph(dataset, finalKeyPairs, anchor);
+            results = (verify) ? [await di_ecdsa.verifyEmbeddedProofGraph(proof)] : [false];
+            if (!no_output) write_quads(proof);
         } else {
             if (!quiet) console.log(`Generating a proof graphs for "${input}"\n`);
-            proofs = await di_ecdsa.generateProofGraph(dataset, finalKeyPairs);
+            const proofs: rdf.DatasetCore[] = await di_ecdsa.generateProofGraph(dataset, finalKeyPairs);
             results = (verify) ? await di_ecdsa.verifyProofGraph(dataset, proofs) : [false]
+            if (!no_output) for (const proof of proofs) write_quads(proof)
         }
-        if (!no_output) for (const proof of proofs) write_quads(proof)
         if (!quiet) console.log(verify ? `>>> Verification results: ${results}` : `>>> No verification was required`);
     } else {
         const keyPair: KeyPair = keyPairs instanceof Array ? keyPairs[0] : null
