@@ -1,9 +1,12 @@
 /// <reference types="node" />
-import * as rdf       from '@rdfjs/types';
-import * as n3        from 'n3';
-import { v4 as uuid } from 'uuid';
+import * as rdf          from '@rdfjs/types';
+import * as n3           from 'n3';
+import { v4 as uuid }    from 'uuid';
+import * as errors       from './lib/errors';
+import { ProblemDetail } from './lib/errors';
+export { ProblemDetail } from './lib/errors';
 import {
-    createPrefix, isDatasetCore, convertToStore, DatasetMap,
+    createPrefix, isDatasetCore, convertToStore, DatasetMap, MapContent,
     textToArrayBuffer, calculateDatasetHash, arrayBufferToBase64Url, base64UrlToArrayBuffer,
  }  from './lib/utils';
 
@@ -14,6 +17,13 @@ const { namedNode, literal, quad } = n3.DataFactory;
 export enum Confidentiality {
     public = "public",
     secret = "secret"
+}
+
+export interface VerificationResult {
+    verified         : boolean,
+    verifiedDocument : rdf.DatasetCore,
+    warnings         : ProblemDetail[]; 
+    errors           : ProblemDetail[];
 }
 
 /**
@@ -49,13 +59,20 @@ const sec_prefix = createPrefix("https://w3id.org/security#");
 const rdf_prefix = createPrefix("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
 const xsd_prefix = createPrefix("http://www.w3.org/2001/XMLSchema#");
 
-const rdf_type: rdf.NamedNode         = rdf_prefix('type');   
-const sec_proof: rdf.NamedNode        = sec_prefix('proof');
-const sec_proofGraph: rdf.NamedNode   = sec_prefix('ProofGraph');
-const sec_di_proof: rdf.NamedNode     = sec_prefix('DataIntegrityProof');
-const sec_proofValue: rdf.NamedNode   = sec_prefix('proofValue');
-const sec_publicKeyJwk: rdf.NamedNode = sec_prefix('publicKeyJwk');
-const xsd_datetime: rdf.NamedNode     = xsd_prefix('dateTime');
+const rdf_type: rdf.NamedNode                 = rdf_prefix('type');   
+const sec_proof: rdf.NamedNode                = sec_prefix('proof');
+const sec_proofGraph: rdf.NamedNode           = sec_prefix('ProofGraph');
+const sec_di_proof: rdf.NamedNode             = sec_prefix('DataIntegrityProof');
+const sec_proofValue: rdf.NamedNode           = sec_prefix('proofValue');
+const sec_publicKeyJwk: rdf.NamedNode         = sec_prefix('publicKeyJwk');
+const sec_proofPurpose: rdf.NamedNode         = sec_prefix('proofPurpose');
+const sec_authenticationMethod: rdf.NamedNode = sec_prefix('authenticationMethod')
+const sec_assertionMethod: rdf.NamedNode      = sec_prefix('assertionMethod');
+const sec_verificationMethod: rdf.NamedNode   = sec_prefix('verificationMethod');
+const sec_expires: rdf.NamedNode              = sec_prefix('expires');
+const sec_revoked: rdf.NamedNode              = sec_prefix('revoked');
+const sec_created: rdf.NamedNode              = sec_prefix('created');
+const xsd_datetime: rdf.NamedNode             = xsd_prefix('dateTime');
 
 
 
@@ -72,10 +89,22 @@ abstract class DataIntegrity {
     protected _cryptosuite : string;
     protected _hash        : string;
     protected _curve       : string;
+    protected _result      : VerificationResult;
 
     constructor() {
         this._hash = "SHA-256";
+        this.initResults();
     }
+
+    protected initResults() {
+        this._result = {
+            verified         : false,
+            verifiedDocument : null,
+            warnings         : [],
+            errors           : [],
+        }
+    }
+
 
     // get algorithm(): string { return this._algorithm }
     // get cryptosuite(): string { return this._cryptosuite; }
@@ -92,21 +121,25 @@ abstract class DataIntegrity {
      * @param type - whether this is a private or public key (usable to sign or verify, respectively)
      * 
      * @returns
-     * @throws - the key is invalid for some reasons
      */
-    protected async importKey(key: JsonWebKey, type: Confidentiality): Promise<CryptoKey> {
-        const retval = await crypto.subtle.importKey("jwk", key,
-            {
-                name: this._algorithm,
-                namedCurve: this._curve,
-            },
-            true,
-            type === Confidentiality.public ? ["verify"] : ["sign"]
-        );
-        if (retval === null) {
-            throw new Error(`Invalid key: ${JSON.stringify(key,null,4)}`);
+    protected async importKey(key: JsonWebKey, type: Confidentiality): Promise<CryptoKey | null> {
+        try {
+            const retval = await crypto.subtle.importKey("jwk", key,
+                {
+                    name: this._algorithm,
+                    namedCurve: this._curve,
+                },
+                true,
+                type === Confidentiality.public ? ["verify"] : ["sign"]
+            );
+            if (retval === null) {
+                this._result.errors.push(new errors.Invalid_Verification_Method(`Invalid key: ${JSON.stringify(key,null,4)}`));
+            }
+            return retval;
+        } catch(e) {
+            this._result.errors.push(new errors.Invalid_Verification_Method(`Invalid key: ${JSON.stringify(key)} (${e.message})`));
+            return null;
         }
-        return retval;
     };
 
     /**
@@ -122,15 +155,19 @@ abstract class DataIntegrity {
         // This is the "core"...
         const signHashValue = async (): Promise<string> => {
             const key: CryptoKey = await this.importKey(keyPair.private, Confidentiality.secret);
-            const raw_signature: ArrayBuffer = await crypto.subtle.sign(
-                {
-                    name: this._algorithm,
-                    hash: this._hash
-                },
-                key,
-                textToArrayBuffer(hashValue)
-            );
-            return `u${arrayBufferToBase64Url(raw_signature)}`;           
+            if (key === null) {
+                return "";
+            } else {
+                const raw_signature: ArrayBuffer = await crypto.subtle.sign(
+                    {
+                        name: this._algorithm,
+                        hash: this._hash
+                    },
+                    key,
+                    textToArrayBuffer(hashValue)
+                );
+                return `u${arrayBufferToBase64Url(raw_signature)}`;
+            }
         };
 
         // Create a proof graph. Just a boring set of quad generations...
@@ -142,7 +179,7 @@ abstract class DataIntegrity {
             const proofGraph = namedNode(proofGraphId);
 
             const verificationMethodId = `urn:uuid:${uuid()}`
-            const keyGraph = namedNode(verificationMethodId);
+            const keyResource = namedNode(verificationMethodId);
 
             retval.addQuads([
                 quad(
@@ -152,82 +189,186 @@ abstract class DataIntegrity {
                     proofGraph, sec_prefix('cryptosuite'), literal(this._cryptosuite)
                 ),
                 quad(
-                    proofGraph, sec_prefix('created'), literal((new Date()).toISOString(), xsd_datetime)
+                    proofGraph, sec_created, literal((new Date()).toISOString(), xsd_datetime)
                 ),
                 quad(
-                    proofGraph, sec_prefix('verificationMethod'), keyGraph
+                    proofGraph, sec_verificationMethod, keyResource
                 ),
                 quad(
                     proofGraph, sec_proofValue, literal(proofValue)
                 ),
                 quad(
-                    proofGraph, sec_prefix('proofPurpose'), sec_prefix('authenticationMethod')
+                    proofGraph, sec_proofPurpose, sec_authenticationMethod
+                ),
+                quad(
+                    proofGraph, sec_proofPurpose, sec_assertionMethod
                 ),
 
                 quad(
-                    keyGraph, rdf_type, sec_prefix('JsonWebKey')
+                    keyResource, rdf_type, sec_prefix('JsonWebKey')
                 ),
                 quad(
-                    keyGraph, sec_publicKeyJwk, literal(JSON.stringify(keyPair.public), rdf_prefix('JSON'))
+                    keyResource, sec_publicKeyJwk, literal(JSON.stringify(keyPair.public), rdf_prefix('JSON'))
                 ),
             ]);
-            if (keyPair.controller) retval.add(quad(keyGraph, sec_prefix('controller'), namedNode(keyPair.controller)));
-            if (keyPair.expires) retval.add(quad(keyGraph, sec_prefix('expires'), literal(keyPair.expires, xsd_datetime)));
-            if (keyPair.revoked) retval.add(quad(keyGraph, sec_prefix('revoked'), literal(keyPair.revoked, xsd_datetime)));
+            if (keyPair.controller) retval.add(quad(keyResource, sec_prefix('controller'), namedNode(keyPair.controller)));
+            if (keyPair.expires) retval.add(quad(keyResource, sec_expires, literal(keyPair.expires, xsd_datetime)));
+            if (keyPair.revoked) retval.add(quad(keyResource, sec_revoked, literal(keyPair.revoked, xsd_datetime)));
             return retval;
         };
         return createProofGraph(await signHashValue());
     }
 
     /**
-     * Check one proof graph, ie, whether the included signature corresponds to the hash value
+     * Check one proof graph, ie, whether the included signature corresponds to the hash value.
+     * 
+     * The following checks are also made and, possibly, exception are raised with errors according to 
+     * the DI standard:
+     * 
+     * 1. There should be exactly one proof value
+     * 2. There should be exactly one verification method, which should be a separate resource containing the key
+     * 3. The key's possible expiration and revocation dates are checked and compared to the current time which should be
+     * "before"
+     * 4. The proof's creation date must be before the current time
+     * 5. The proof purpose(s) must be set, and the values are either authentication or verification
      * 
      * @param hash 
      * @param proof 
      * @returns 
      */
-    protected async validateProofGraph(hash: string, proof: n3.Store): Promise<boolean> {
+    protected async verifyAProofGraph(hash: string, proof: n3.Store, proofId?: rdf.Quad_Graph): Promise<boolean> {
+        let localErrors   : errors.ProblemDetail[] = [];
+        let localWarnings : errors.ProblemDetail[] = [];
+
         // Verify the signature by check signature of the hash with the key
         // This is the "core"...
         const checkHashValue = async (proof_value: string, key_jwk: JsonWebKey): Promise<boolean> => {
             const key: CryptoKey = await this.importKey(key_jwk, Confidentiality.public);
             const signature_array: ArrayBuffer = base64UrlToArrayBuffer(proof_value.slice(1));
             const data: ArrayBuffer = textToArrayBuffer(hash);
-            const retval: boolean = await crypto.subtle.verify(
-                {
-                    name: this._algorithm,
-                    hash: this._hash
-                },
-                key,
-                signature_array,
-                data
-            );
-            return retval;
+            if (key === null) {
+                return false;
+            } else {
+                const retval: boolean = await crypto.subtle.verify(
+                    {
+                        name: this._algorithm,
+                        hash: this._hash
+                    },
+                    key,
+                    signature_array,
+                    data
+                );
+                return retval;
+            }
         };
 
-        const getProofValue = (store: n3.Store): string => {
+        const getProofValue = (store: n3.Store): string | null => {
             // Retrieve the signature value per spec:
             const proof_values: rdf.Quad[] = store.getQuads(null, sec_proofValue, null, null);
-            if (proof_values.length !== 1) {
-                throw new Error("Incorrect proof values");
+            if (proof_values.length === 0) {
+                localErrors.push(new errors.Malformed_Proof_Error("No proof value"));
+                return null;
+            } else if(proof_values.length > 1) {
+                localErrors.push(new errors.Malformed_Proof_Error("Several proof values"));
             }
             return proof_values[0].object.value;
         };
 
-        const getPublicKey = (store: n3.Store): JsonWebKey => {
-            const keys: rdf.Quad[] = store.getQuads(null, sec_publicKeyJwk, null, null);
-            if (keys.length !== 1) {
-                throw new Error("Incorrect key values");
+        const getPublicKey = (store: n3.Store): JsonWebKey | null => {
+            // first see if the verificationMethod has been set properly
+            const verificationMethod: rdf.Quad[] = store.getQuads(null, sec_verificationMethod, null, null);
+            if (verificationMethod.length === 0) {
+                localErrors.push(new errors.Malformed_Proof_Error("No verification method"));
+                return null;
+            } else if (verificationMethod.length > 1) {
+                localErrors.push(new errors.Malformed_Proof_Error("Several verification methods"));
             }
-            return JSON.parse(keys[0].object.value) as JsonWebKey;
+
+            const publicKey = verificationMethod[0].object;
+            const keys: rdf.Quad[] = store.getQuads(publicKey, sec_publicKeyJwk, null, null);
+            if (keys.length === 0) {
+                localErrors.push(new errors.Invalid_Verification_Method(`No key values`));
+                return null;
+            } else if (keys.length > 1) {
+                localErrors.push(new errors.Invalid_Verification_Method("More than one keys provided"));
+            }
+
+            // Check the creation/expiration/revocation dates, if any...
+            const now = new Date();
+            const creationDates: rdf.Quad[] = store.getQuads(null, sec_created, null, null);
+            for (const exp of creationDates) {
+                if ((new Date(exp.object.value)) > now) {
+                    localWarnings.push(new errors.Invalid_Verification_Method(`Proof was created in the future... ${exp.object.value}`));
+                }
+            }
+
+            const expirationDates: rdf.Quad[] = store.getQuads(publicKey, sec_expires, null, null);
+            for (const exp of expirationDates) {
+                if ((new Date(exp.object.value)) < now) {
+                    localErrors.push(new errors.Invalid_Verification_Method(`<${publicKey.value}> key expired on ${exp.object.value}`));
+                    return null;
+                }
+            }
+            const revocationDates: rdf.Quad[] = store.getQuads(publicKey, sec_revoked, null, null);
+            for (const exp of revocationDates) {
+                if ((new Date(exp.object.value)) < now) {
+                    localErrors.push(new errors.Invalid_Verification_Method(`<${publicKey.value}> key was revoked on ${exp.object.value}`));
+                    return null;
+                }
+            }
+
+            try {
+                return JSON.parse(keys[0].object.value) as JsonWebKey;
+            } catch(e) {
+                // This happens if there is a JSON parse error with the key...
+                localWarnings.push(new errors.Malformed_Proof_Error(`Parsing error for JWK: ${e.message}`));
+                return null;
+            }
         };
 
-        const proofValue: string = getProofValue(proof);
+        // Check the "proofPurpose" property value
+        const checkProofPurposes = (store: n3.Store): void => {
+            const purposes: rdf.Quad[] = store.getQuads(null, sec_proofPurpose, null, null);
+            if (purposes.length === 0) {
+                throw new errors.Invalid_Verification_Method("No proof purpose set");
+            } else {
+                const wrongPurposes: string[] = [];
+                for (const q of purposes) {
+                    if (!(q.object.equals(sec_authenticationMethod) || q.object.equals(sec_assertionMethod))) {
+                        wrongPurposes.push(`<${q.object.value}>`);
+                    }
+                }
+                if (wrongPurposes.length > 0) {
+                    localErrors.push(new errors.Mismatched_Proof_Purpose(`Invalid proof purpose value(s): ${wrongPurposes.join(", ")}`));
+                }
+            }
+        }
+
+        // Retrieve necessary values with checks
+        checkProofPurposes(proof);
         const publicKey: JsonWebKey = getPublicKey(proof);
+        const proofValue: string = getProofValue(proof);
+
+        // The final set of error/warning should be modified with the proof graph's ID, if applicable
+        if (proofId) {
+            localErrors.forEach((error) => {
+                error.detail = `${error.detail} (graph ID: <${proofId.value}>)`;
+            });
+            localWarnings.forEach((warning) => {
+                warning.detail = `${warning.detail} (<${proofId.value}>)`;
+            })
+        }
+        this._result.errors  = [...this._result.errors, ...localErrors];
+        this._result.warnings = [...this._result.warnings, ...localWarnings];
 
         // Here we go with checking...
-        const retval: boolean = await checkHashValue(proofValue, publicKey);
-        return retval;
+        if (publicKey !== null && proofValue !== null) {
+            const check_results: boolean = await checkHashValue(proofValue, publicKey);
+            // the return value should nevertheless be false if there have been errors
+            return check_results ? localErrors.length === 0 : true
+        } else {
+            return false;
+        }
     }
 
 
@@ -239,11 +380,15 @@ abstract class DataIntegrity {
      * 
      * @param dataset 
      * @param keyPair 
+     * @throws - an error if there was a key issue while signing.
      * @returns 
      */
     async generateProofGraph(dataset: rdf.DatasetCore, keyPair: Iterable<KeyPair>): Promise<rdf.DatasetCore[]>;
     async generateProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair): Promise<rdf.DatasetCore>;
     async generateProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair | Iterable<KeyPair>): Promise<rdf.DatasetCore | rdf.DatasetCore[]> {
+        // Start fresh with results
+        this.initResults();
+
         // This is to be signed
         const toBeSigned = await calculateDatasetHash(dataset);
         // prepare for the overload of arguments
@@ -252,7 +397,13 @@ abstract class DataIntegrity {
         const promises: Promise<rdf.DatasetCore>[] = Array.from(keyPairs).map((keypair: KeyPair) => this.generateAProofGraph(toBeSigned, keypair));
         const retval: rdf.DatasetCore[] = await Promise.all(promises);
         // return by taking care of overloading.
-        return isKeyPair(keyPair) ? retval[0] : retval;
+        if (this._result.errors.length !== 0) {
+            // There were possible errors while generating the signatures
+            const message: string = JSON.stringify(this._result.errors,null,2);
+            throw new errors.Proof_Generation_Error(message);
+        } else {
+            return isKeyPair(keyPair) ? retval[0] : retval;
+        }
     }
 
 
@@ -269,6 +420,9 @@ abstract class DataIntegrity {
     async verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore): Promise<boolean>;
     async verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore[]): Promise<boolean[]>;
     async verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore | rdf.DatasetCore[]): Promise<boolean|boolean[]> {
+        // start fresh with the results:
+        this.initResults();
+        
         // this is the value that must be checked...
         const hash = await calculateDatasetHash(dataset);
 
@@ -276,7 +430,7 @@ abstract class DataIntegrity {
         const proofs: rdf.DatasetCore[] = isDatasetCore(proofGraph) ? [proofGraph] : proofGraph;
 
         // the "convertToStore" intermediate step is necessary; the proof graph checker needs a n3.Store
-        const promises: Promise<boolean>[] = proofs.map(convertToStore).map((pr_graph: n3.Store): Promise<boolean> => this.validateProofGraph(hash,pr_graph));
+        const promises: Promise<boolean>[] = proofs.map(convertToStore).map((pr_graph: n3.Store): Promise<boolean> => this.verifyAProofGraph(hash, pr_graph));
         const results: boolean[] = await Promise.all(promises);
 
         return isDatasetCore(proofGraph) ? results[0] : results; 
@@ -344,10 +498,23 @@ abstract class DataIntegrity {
      * of a type relationship to `DataIntegrityProof`; the result is the conjunction of the validation result for
      * each proof graphs separately.
      * 
-     * @param dataset 
+     * The following checks are also made and, possibly, exception are raised with errors according to 
+     * the DI standard:
+     * 
+     * 1. There should be exactly one proof value
+     * 2. There should be exactly one verification method, which should be a separate resource containing the key
+     * 3. The key's possible expiration and revocation dates are checked and compared to the current time which should be
+     * "before"
+     * 4. The proof's creation date must be before the current time
+     * 5. The proof purpose(s) must be set, and the values are either authentication or verification
+
+    * @param dataset 
      * @returns 
      */
-    async verifyEmbeddedProofGraph(dataset: rdf.DatasetCore): Promise<boolean> {
+    async verifyEmbeddedProofGraph(dataset: rdf.DatasetCore): Promise<VerificationResult> {
+        // start fresh with the results:
+        this.initResults();
+
         const dataStore   = new n3.Store();
         const proofGraphs = new DatasetMap();
 
@@ -388,11 +555,17 @@ abstract class DataIntegrity {
 
         const hash = await calculateDatasetHash(dataStore);
 
-        const proofs: n3.Store[] = proofGraphs.datasets(); 
-        const promises: Promise<boolean>[] = proofs.map((prGraph: n3.Store): Promise<boolean> => this.validateProofGraph(hash, prGraph));
+        const proofs: MapContent[] = proofGraphs.data(); 
+        const promises: Promise<boolean>[] = proofs.map((prGraph: MapContent): Promise<boolean> => this.verifyAProofGraph(hash, prGraph.dataset, prGraph.id));
         const results: boolean[] = await Promise.all(promises);
 
-        return !results.includes(false);
+        if (this._result.errors.length > 0) {
+            this._result.verified = false;
+        } else {
+            this._result.verified = !results.includes(false);
+        }
+        this._result.verifiedDocument = this._result.verified ? dataStore : null;
+        return this._result
     };
 }
 

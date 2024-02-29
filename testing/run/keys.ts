@@ -3,10 +3,9 @@ import * as fs          from 'node:fs/promises';
 import { KeyPair }      from '../../index';
 
 
-export async function get_keys(set: boolean = false): Promise<Iterable<KeyPair>> {
+export async function get_keys(): Promise<KeyPair[]> {
         const raw_keys: string = await fs.readFile('testing/keys.json', 'utf-8');
-        const keys: KeyPair[] = JSON.parse(raw_keys);
-        return set === true ? new OSet<KeyPair>(keys) : keys;
+        return JSON.parse(raw_keys);
 } 
 
 interface ObjectSet<T> extends Iterable<T> {

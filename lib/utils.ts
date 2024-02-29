@@ -51,7 +51,10 @@ export function createPrefix(uri: string): (l: string) => rdf.NamedNode {
  * Needed to separate the proof graphs from the "real" data
  **************************************************************************************/
 
-interface MapContent {
+/**
+ * Structure with a separate store and its ID as a graph
+ */
+export interface MapContent {
     id      : rdf.Quad_Graph,
     dataset : n3.Store;
 }
@@ -95,6 +98,10 @@ export class DatasetMap {
 
     datasets(): n3.Store[] {
         return Array.from(this.index.values()).map((entry) => entry.dataset);
+    }
+
+    data(): MapContent[] {
+        return Array.from(this.index.values());
     }
 }
 
