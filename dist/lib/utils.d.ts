@@ -17,6 +17,17 @@ import * as n3 from 'n3';
  * @returns
  */
 export declare function createPrefix(uri: string): (l: string) => rdf.NamedNode;
+/***************************************************************************************
+ * Map to help separating the content of a dataset into several different datasets.
+ * Needed to separate the proof graphs from the "real" data
+ **************************************************************************************/
+/**
+ * Structure with a separate store and its ID as a graph
+ */
+export interface MapContent {
+    id: rdf.Quad_Graph;
+    dataset: n3.Store;
+}
 /**
  * A shell around a Map, which is indexed by the *value* of rdf Terms.
  *
@@ -36,6 +47,7 @@ export declare class DatasetMap {
     item(graph: rdf.Quad_Graph): n3.Store;
     has(graph: rdf.Term): boolean;
     datasets(): n3.Store[];
+    data(): MapContent[];
 }
 /*****************************************************************************************
  * Misc Utility Functions

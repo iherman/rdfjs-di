@@ -503,12 +503,11 @@ abstract class DataIntegrity {
      * 
      * 1. There should be exactly one proof value
      * 2. There should be exactly one verification method, which should be a separate resource containing the key
-     * 3. The key's possible expiration and revocation dates are checked and compared to the current time which should be
-     * "before"
+     * 3. The key's possible expiration and revocation dates are checked and compared to the current time which should be "before"
      * 4. The proof's creation date must be before the current time
      * 5. The proof purpose(s) must be set, and the values are either authentication or verification
 
-    * @param dataset 
+     * @param dataset 
      * @returns 
      */
     async verifyEmbeddedProofGraph(dataset: rdf.DatasetCore): Promise<VerificationResult> {

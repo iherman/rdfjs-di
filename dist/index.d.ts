@@ -1,9 +1,17 @@
 import * as rdf from '@rdfjs/types';
 import * as n3 from 'n3';
+import { ProblemDetail } from './lib/errors';
+export { ProblemDetail } from './lib/errors';
 /** Values used internally for the crypto functions; they are defined by the WebCrypto spec. */
 export declare enum Confidentiality {
     public = "public",
     secret = "secret"
+}
+export interface VerificationResult {
+    verified: boolean;
+    verifiedDocument: rdf.DatasetCore;
+    warnings: ProblemDetail[];
+    errors: ProblemDetail[];
 }
 /**
  * Crypto key pair. The keys are stored in JWK format.
@@ -30,7 +38,9 @@ declare abstract class DataIntegrity {
     protected _cryptosuite: string;
     protected _hash: string;
     protected _curve: string;
+    protected _result: VerificationResult;
     constructor();
+    protected initResults(): void;
     /**************************************************************************************************/
     /**************************************************************************************************/
     /**
@@ -40,9 +50,8 @@ declare abstract class DataIntegrity {
      * @param type - whether this is a private or public key (usable to sign or verify, respectively)
      *
      * @returns
-     * @throws - the key is invalid for some reasons
      */
-    protected importKey(key: JsonWebKey, type: Confidentiality): Promise<CryptoKey>;
+    protected importKey(key: JsonWebKey, type: Confidentiality): Promise<CryptoKey | null>;
     /**
      * Generate a (separate) proof graph, per the DI spec. The signature is stored in
      * multibase format, using base64url encoding.
@@ -53,13 +62,23 @@ declare abstract class DataIntegrity {
      */
     protected generateAProofGraph(hashValue: string, keyPair: KeyPair): Promise<rdf.DatasetCore>;
     /**
-     * Check one proof graph, ie, whether the included signature corresponds to the hash value
+     * Check one proof graph, ie, whether the included signature corresponds to the hash value.
+     *
+     * The following checks are also made and, possibly, exception are raised with errors according to
+     * the DI standard:
+     *
+     * 1. There should be exactly one proof value
+     * 2. There should be exactly one verification method, which should be a separate resource containing the key
+     * 3. The key's possible expiration and revocation dates are checked and compared to the current time which should be
+     * "before"
+     * 4. The proof's creation date must be before the current time
+     * 5. The proof purpose(s) must be set, and the values are either authentication or verification
      *
      * @param hash
      * @param proof
      * @returns
      */
-    protected validateProofGraph(hash: string, proof: n3.Store): Promise<boolean>;
+    protected verifyAProofGraph(hash: string, proof: n3.Store, proofId?: rdf.Quad_Graph): Promise<boolean>;
     /**
      * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in
      * multibase format, using base64url encoding.
@@ -68,6 +87,7 @@ declare abstract class DataIntegrity {
      *
      * @param dataset
      * @param keyPair
+     * @throws - an error if there was a key issue while signing.
      * @returns
      */
     generateProofGraph(dataset: rdf.DatasetCore, keyPair: Iterable<KeyPair>): Promise<rdf.DatasetCore[]>;
@@ -107,10 +127,19 @@ declare abstract class DataIntegrity {
      * of a type relationship to `DataIntegrityProof`; the result is the conjunction of the validation result for
      * each proof graphs separately.
      *
+     * The following checks are also made and, possibly, exception are raised with errors according to
+     * the DI standard:
+     *
+     * 1. There should be exactly one proof value
+     * 2. There should be exactly one verification method, which should be a separate resource containing the key
+     * 3. The key's possible expiration and revocation dates are checked and compared to the current time which should be "before"
+     * 4. The proof's creation date must be before the current time
+     * 5. The proof purpose(s) must be set, and the values are either authentication or verification
+
      * @param dataset
      * @returns
      */
-    verifyEmbeddedProofGraph(dataset: rdf.DatasetCore): Promise<boolean>;
+    verifyEmbeddedProofGraph(dataset: rdf.DatasetCore): Promise<VerificationResult>;
 }
 /**
  * Real instantiation of a DI cryptosuite: ecdsa-2022.
@@ -118,4 +147,3 @@ declare abstract class DataIntegrity {
 export declare class DI_ECDSA extends DataIntegrity {
     constructor();
 }
-export {};

@@ -83,6 +83,9 @@ class DatasetMap {
     datasets() {
         return Array.from(this.index.values()).map((entry) => entry.dataset);
     }
+    data() {
+        return Array.from(this.index.values());
+    }
 }
 exports.DatasetMap = DatasetMap;
 /*****************************************************************************************

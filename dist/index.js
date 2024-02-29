@@ -1,8 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DI_ECDSA = exports.Confidentiality = void 0;
+exports.DI_ECDSA = exports.Confidentiality = exports.ProblemDetail = void 0;
 const n3 = require("n3");
 const uuid_1 = require("uuid");
+const errors = require("./lib/errors");
+var errors_1 = require("./lib/errors");
+Object.defineProperty(exports, "ProblemDetail", { enumerable: true, get: function () { return errors_1.ProblemDetail; } });
 const utils_1 = require("./lib/utils");
 // n3.DataFactory is a namespace with some functions...
 const { namedNode, literal, quad } = n3.DataFactory;
@@ -34,6 +37,13 @@ const sec_proofGraph = sec_prefix('ProofGraph');
 const sec_di_proof = sec_prefix('DataIntegrityProof');
 const sec_proofValue = sec_prefix('proofValue');
 const sec_publicKeyJwk = sec_prefix('publicKeyJwk');
+const sec_proofPurpose = sec_prefix('proofPurpose');
+const sec_authenticationMethod = sec_prefix('authenticationMethod');
+const sec_assertionMethod = sec_prefix('assertionMethod');
+const sec_verificationMethod = sec_prefix('verificationMethod');
+const sec_expires = sec_prefix('expires');
+const sec_revoked = sec_prefix('revoked');
+const sec_created = sec_prefix('created');
 const xsd_datetime = xsd_prefix('dateTime');
 /*****************************************************************************************
  * The real meat...
@@ -47,8 +57,18 @@ class DataIntegrity {
     _cryptosuite;
     _hash;
     _curve;
+    _result;
     constructor() {
         this._hash = "SHA-256";
+        this.initResults();
+    }
+    initResults() {
+        this._result = {
+            verified: false,
+            verifiedDocument: null,
+            warnings: [],
+            errors: [],
+        };
     }
     // get algorithm(): string { return this._algorithm }
     // get cryptosuite(): string { return this._cryptosuite; }
@@ -64,17 +84,22 @@ class DataIntegrity {
      * @param type - whether this is a private or public key (usable to sign or verify, respectively)
      *
      * @returns
-     * @throws - the key is invalid for some reasons
      */
     async importKey(key, type) {
-        const retval = await crypto.subtle.importKey("jwk", key, {
-            name: this._algorithm,
-            namedCurve: this._curve,
-        }, true, type === Confidentiality.public ? ["verify"] : ["sign"]);
-        if (retval === null) {
-            throw new Error(`Invalid key: ${JSON.stringify(key, null, 4)}`);
+        try {
+            const retval = await crypto.subtle.importKey("jwk", key, {
+                name: this._algorithm,
+                namedCurve: this._curve,
+            }, true, type === Confidentiality.public ? ["verify"] : ["sign"]);
+            if (retval === null) {
+                this._result.errors.push(new errors.Invalid_Verification_Method(`Invalid key: ${JSON.stringify(key, null, 4)}`));
+            }
+            return retval;
         }
-        return retval;
+        catch (e) {
+            this._result.errors.push(new errors.Invalid_Verification_Method(`Invalid key: ${JSON.stringify(key)} (${e.message})`));
+            return null;
+        }
     }
     ;
     /**
@@ -90,11 +115,16 @@ class DataIntegrity {
         // This is the "core"...
         const signHashValue = async () => {
             const key = await this.importKey(keyPair.private, Confidentiality.secret);
-            const raw_signature = await crypto.subtle.sign({
-                name: this._algorithm,
-                hash: this._hash
-            }, key, (0, utils_1.textToArrayBuffer)(hashValue));
-            return `u${(0, utils_1.arrayBufferToBase64Url)(raw_signature)}`;
+            if (key === null) {
+                return "";
+            }
+            else {
+                const raw_signature = await crypto.subtle.sign({
+                    name: this._algorithm,
+                    hash: this._hash
+                }, key, (0, utils_1.textToArrayBuffer)(hashValue));
+                return `u${(0, utils_1.arrayBufferToBase64Url)(raw_signature)}`;
+            }
         };
         // Create a proof graph. Just a boring set of quad generations...
         const createProofGraph = (proofValue) => {
@@ -103,69 +133,173 @@ class DataIntegrity {
             const proofGraphId = `urn:uuid:${(0, uuid_1.v4)()}`;
             const proofGraph = namedNode(proofGraphId);
             const verificationMethodId = `urn:uuid:${(0, uuid_1.v4)()}`;
-            const keyGraph = namedNode(verificationMethodId);
+            const keyResource = namedNode(verificationMethodId);
             retval.addQuads([
                 quad(proofGraph, rdf_type, sec_di_proof),
                 quad(proofGraph, sec_prefix('cryptosuite'), literal(this._cryptosuite)),
-                quad(proofGraph, sec_prefix('created'), literal((new Date()).toISOString(), xsd_datetime)),
-                quad(proofGraph, sec_prefix('verificationMethod'), keyGraph),
+                quad(proofGraph, sec_created, literal((new Date()).toISOString(), xsd_datetime)),
+                quad(proofGraph, sec_verificationMethod, keyResource),
                 quad(proofGraph, sec_proofValue, literal(proofValue)),
-                quad(proofGraph, sec_prefix('proofPurpose'), sec_prefix('authenticationMethod')),
-                quad(keyGraph, rdf_type, sec_prefix('JsonWebKey')),
-                quad(keyGraph, sec_publicKeyJwk, literal(JSON.stringify(keyPair.public), rdf_prefix('JSON'))),
+                quad(proofGraph, sec_proofPurpose, sec_authenticationMethod),
+                quad(proofGraph, sec_proofPurpose, sec_assertionMethod),
+                quad(keyResource, rdf_type, sec_prefix('JsonWebKey')),
+                quad(keyResource, sec_publicKeyJwk, literal(JSON.stringify(keyPair.public), rdf_prefix('JSON'))),
             ]);
             if (keyPair.controller)
-                retval.add(quad(keyGraph, sec_prefix('controller'), namedNode(keyPair.controller)));
+                retval.add(quad(keyResource, sec_prefix('controller'), namedNode(keyPair.controller)));
             if (keyPair.expires)
-                retval.add(quad(keyGraph, sec_prefix('expires'), literal(keyPair.expires, xsd_datetime)));
+                retval.add(quad(keyResource, sec_expires, literal(keyPair.expires, xsd_datetime)));
             if (keyPair.revoked)
-                retval.add(quad(keyGraph, sec_prefix('revoked'), literal(keyPair.revoked, xsd_datetime)));
+                retval.add(quad(keyResource, sec_revoked, literal(keyPair.revoked, xsd_datetime)));
             return retval;
         };
         return createProofGraph(await signHashValue());
     }
     /**
-     * Check one proof graph, ie, whether the included signature corresponds to the hash value
+     * Check one proof graph, ie, whether the included signature corresponds to the hash value.
+     *
+     * The following checks are also made and, possibly, exception are raised with errors according to
+     * the DI standard:
+     *
+     * 1. There should be exactly one proof value
+     * 2. There should be exactly one verification method, which should be a separate resource containing the key
+     * 3. The key's possible expiration and revocation dates are checked and compared to the current time which should be
+     * "before"
+     * 4. The proof's creation date must be before the current time
+     * 5. The proof purpose(s) must be set, and the values are either authentication or verification
      *
      * @param hash
      * @param proof
      * @returns
      */
-    async validateProofGraph(hash, proof) {
+    async verifyAProofGraph(hash, proof, proofId) {
+        let localErrors = [];
+        let localWarnings = [];
         // Verify the signature by check signature of the hash with the key
         // This is the "core"...
         const checkHashValue = async (proof_value, key_jwk) => {
             const key = await this.importKey(key_jwk, Confidentiality.public);
             const signature_array = (0, utils_1.base64UrlToArrayBuffer)(proof_value.slice(1));
             const data = (0, utils_1.textToArrayBuffer)(hash);
-            const retval = await crypto.subtle.verify({
-                name: this._algorithm,
-                hash: this._hash
-            }, key, signature_array, data);
-            return retval;
+            if (key === null) {
+                return false;
+            }
+            else {
+                const retval = await crypto.subtle.verify({
+                    name: this._algorithm,
+                    hash: this._hash
+                }, key, signature_array, data);
+                return retval;
+            }
         };
         const getProofValue = (store) => {
             // Retrieve the signature value per spec:
             const proof_values = store.getQuads(null, sec_proofValue, null, null);
-            if (proof_values.length !== 1) {
-                throw new Error("Incorrect proof values");
+            if (proof_values.length === 0) {
+                localErrors.push(new errors.Malformed_Proof_Error("No proof value"));
+                return null;
+            }
+            else if (proof_values.length > 1) {
+                localErrors.push(new errors.Malformed_Proof_Error("Several proof values"));
             }
             return proof_values[0].object.value;
         };
         const getPublicKey = (store) => {
-            const keys = store.getQuads(null, sec_publicKeyJwk, null, null);
-            if (keys.length !== 1) {
-                throw new Error("Incorrect key values");
+            // first see if the verificationMethod has been set properly
+            const verificationMethod = store.getQuads(null, sec_verificationMethod, null, null);
+            if (verificationMethod.length === 0) {
+                localErrors.push(new errors.Malformed_Proof_Error("No verification method"));
+                return null;
             }
-            return JSON.parse(keys[0].object.value);
+            else if (verificationMethod.length > 1) {
+                localErrors.push(new errors.Malformed_Proof_Error("Several verification methods"));
+            }
+            const publicKey = verificationMethod[0].object;
+            const keys = store.getQuads(publicKey, sec_publicKeyJwk, null, null);
+            if (keys.length === 0) {
+                localErrors.push(new errors.Invalid_Verification_Method(`No key values`));
+                return null;
+            }
+            else if (keys.length > 1) {
+                localErrors.push(new errors.Invalid_Verification_Method("More than one keys provided"));
+            }
+            // Check the creation/expiration/revocation dates, if any...
+            const now = new Date();
+            const creationDates = store.getQuads(null, sec_created, null, null);
+            for (const exp of creationDates) {
+                if ((new Date(exp.object.value)) > now) {
+                    localWarnings.push(new errors.Invalid_Verification_Method(`Proof was created in the future... ${exp.object.value}`));
+                }
+            }
+            const expirationDates = store.getQuads(publicKey, sec_expires, null, null);
+            for (const exp of expirationDates) {
+                if ((new Date(exp.object.value)) < now) {
+                    localErrors.push(new errors.Invalid_Verification_Method(`<${publicKey.value}> key expired on ${exp.object.value}`));
+                    return null;
+                }
+            }
+            const revocationDates = store.getQuads(publicKey, sec_revoked, null, null);
+            for (const exp of revocationDates) {
+                if ((new Date(exp.object.value)) < now) {
+                    localErrors.push(new errors.Invalid_Verification_Method(`<${publicKey.value}> key was revoked on ${exp.object.value}`));
+                    return null;
+                }
+            }
+            try {
+                return JSON.parse(keys[0].object.value);
+            }
+            catch (e) {
+                // This happens if there is a JSON parse error with the key...
+                localWarnings.push(new errors.Malformed_Proof_Error(`Parsing error for JWK: ${e.message}`));
+                return null;
+            }
         };
-        const proofValue = getProofValue(proof);
+        // Check the "proofPurpose" property value
+        const checkProofPurposes = (store) => {
+            const purposes = store.getQuads(null, sec_proofPurpose, null, null);
+            if (purposes.length === 0) {
+                throw new errors.Invalid_Verification_Method("No proof purpose set");
+            }
+            else {
+                const wrongPurposes = [];
+                for (const q of purposes) {
+                    if (!(q.object.equals(sec_authenticationMethod) || q.object.equals(sec_assertionMethod))) {
+                        wrongPurposes.push(`<${q.object.value}>`);
+                    }
+                }
+                if (wrongPurposes.length > 0) {
+                    localErrors.push(new errors.Mismatched_Proof_Purpose(`Invalid proof purpose value(s): ${wrongPurposes.join(", ")}`));
+                }
+            }
+        };
+        // Retrieve necessary values with checks
+        checkProofPurposes(proof);
         const publicKey = getPublicKey(proof);
+        const proofValue = getProofValue(proof);
+        // The final set of error/warning should be modified with the proof graph's ID, if applicable
+        if (proofId) {
+            localErrors.forEach((error) => {
+                error.detail = `${error.detail} (graph ID: <${proofId.value}>)`;
+            });
+            localWarnings.forEach((warning) => {
+                warning.detail = `${warning.detail} (<${proofId.value}>)`;
+            });
+        }
+        this._result.errors = [...this._result.errors, ...localErrors];
+        this._result.warnings = [...this._result.warnings, ...localWarnings];
         // Here we go with checking...
-        const retval = await checkHashValue(proofValue, publicKey);
-        return retval;
+        if (publicKey !== null && proofValue !== null) {
+            const check_results = await checkHashValue(proofValue, publicKey);
+            // the return value should nevertheless be false if there have been errors
+            return check_results ? localErrors.length === 0 : true;
+        }
+        else {
+            return false;
+        }
     }
     async generateProofGraph(dataset, keyPair) {
+        // Start fresh with results
+        this.initResults();
         // This is to be signed
         const toBeSigned = await (0, utils_1.calculateDatasetHash)(dataset);
         // prepare for the overload of arguments
@@ -174,15 +308,24 @@ class DataIntegrity {
         const promises = Array.from(keyPairs).map((keypair) => this.generateAProofGraph(toBeSigned, keypair));
         const retval = await Promise.all(promises);
         // return by taking care of overloading.
-        return isKeyPair(keyPair) ? retval[0] : retval;
+        if (this._result.errors.length !== 0) {
+            // There were possible errors while generating the signatures
+            const message = JSON.stringify(this._result.errors, null, 2);
+            throw new errors.Proof_Generation_Error(message);
+        }
+        else {
+            return isKeyPair(keyPair) ? retval[0] : retval;
+        }
     }
     async verifyProofGraph(dataset, proofGraph) {
+        // start fresh with the results:
+        this.initResults();
         // this is the value that must be checked...
         const hash = await (0, utils_1.calculateDatasetHash)(dataset);
         // just to make the handling uniform...
         const proofs = (0, utils_1.isDatasetCore)(proofGraph) ? [proofGraph] : proofGraph;
         // the "convertToStore" intermediate step is necessary; the proof graph checker needs a n3.Store
-        const promises = proofs.map(utils_1.convertToStore).map((pr_graph) => this.validateProofGraph(hash, pr_graph));
+        const promises = proofs.map(utils_1.convertToStore).map((pr_graph) => this.verifyAProofGraph(hash, pr_graph));
         const results = await Promise.all(promises);
         return (0, utils_1.isDatasetCore)(proofGraph) ? results[0] : results;
     }
@@ -243,10 +386,21 @@ class DataIntegrity {
      * of a type relationship to `DataIntegrityProof`; the result is the conjunction of the validation result for
      * each proof graphs separately.
      *
+     * The following checks are also made and, possibly, exception are raised with errors according to
+     * the DI standard:
+     *
+     * 1. There should be exactly one proof value
+     * 2. There should be exactly one verification method, which should be a separate resource containing the key
+     * 3. The key's possible expiration and revocation dates are checked and compared to the current time which should be "before"
+     * 4. The proof's creation date must be before the current time
+     * 5. The proof purpose(s) must be set, and the values are either authentication or verification
+
      * @param dataset
      * @returns
      */
     async verifyEmbeddedProofGraph(dataset) {
+        // start fresh with the results:
+        this.initResults();
         const dataStore = new n3.Store();
         const proofGraphs = new utils_1.DatasetMap();
         // Separate the core data from the datasets;
@@ -287,10 +441,17 @@ class DataIntegrity {
             }
         }
         const hash = await (0, utils_1.calculateDatasetHash)(dataStore);
-        const proofs = proofGraphs.datasets();
-        const promises = proofs.map((prGraph) => this.validateProofGraph(hash, prGraph));
+        const proofs = proofGraphs.data();
+        const promises = proofs.map((prGraph) => this.verifyAProofGraph(hash, prGraph.dataset, prGraph.id));
         const results = await Promise.all(promises);
-        return !results.includes(false);
+        if (this._result.errors.length > 0) {
+            this._result.verified = false;
+        }
+        else {
+            this._result.verified = !results.includes(false);
+        }
+        this._result.verifiedDocument = this._result.verified ? dataStore : null;
+        return this._result;
     }
     ;
 }
