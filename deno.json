@@ -1,0 +1,30 @@
+{
+  "name": "rdfjs-di",
+  "version": "1.0.0",
+  "description": "Data Integrity used to secure an RDF Dataset",
+  "main": "index.js",
+  "tasks": {
+    "run": "deno run -q --unstable-sloppy-imports --allow-read --allow-env testing/run/main.ts"
+  },
+  "homepage": "https://github.com/iherman/rdfjs-di#README",
+  "compilerOptions": {
+    "lib": [
+      "dom",
+      "deno.ns"
+    ]
+  },
+  "imports": {
+    "commander":             "npm:commander",
+    "rdfjs-c14n":            "npm:rdfjs-c14n@^3.1.0",
+    "@rdfjs/types":          "npm:@rdfjs/types",
+    "@tufjs/canonical-json": "npm:@tufjs/canonical-json",
+    "n3":                    "npm:n3",
+    "uuid":                  "npm:uuid",
+    "./lib/errors":          "./lib/errors.ts",
+    "./lib/utils":           "./lib/utils.ts",
+    "../../index":           "../../index.ts",
+    "./keys":                "./keys.ts",
+    "./rdfn3":               "./rdfn3.ts"
+  }
+
+}

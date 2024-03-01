@@ -4,7 +4,6 @@ import * as n3           from 'n3';
 import { v4 as uuid }    from 'uuid';
 import * as errors       from './lib/errors';
 import { ProblemDetail } from './lib/errors';
-export { ProblemDetail } from './lib/errors';
 import {
     createPrefix, isDatasetCore, convertToStore, DatasetMap, MapContent,
     textToArrayBuffer, calculateDatasetHash, arrayBufferToBase64Url, base64UrlToArrayBuffer,
@@ -21,7 +20,7 @@ export enum Confidentiality {
 
 export interface VerificationResult {
     verified         : boolean,
-    verifiedDocument : rdf.DatasetCore,
+    verifiedDocument : rdf.DatasetCore | null,
     warnings         : ProblemDetail[]; 
     errors           : ProblemDetail[];
 }
@@ -61,7 +60,6 @@ const xsd_prefix = createPrefix("http://www.w3.org/2001/XMLSchema#");
 
 const rdf_type: rdf.NamedNode                 = rdf_prefix('type');   
 const sec_proof: rdf.NamedNode                = sec_prefix('proof');
-const sec_proofGraph: rdf.NamedNode           = sec_prefix('ProofGraph');
 const sec_di_proof: rdf.NamedNode             = sec_prefix('DataIntegrityProof');
 const sec_proofValue: rdf.NamedNode           = sec_prefix('proofValue');
 const sec_publicKeyJwk: rdf.NamedNode         = sec_prefix('publicKeyJwk');
@@ -85,11 +83,19 @@ const xsd_datetime: rdf.NamedNode             = xsd_prefix('dateTime');
  * 
  */
 abstract class DataIntegrity {
-    protected _algorithm   : string;
-    protected _cryptosuite : string;
-    protected _hash        : string;
-    protected _curve       : string;
-    protected _result      : VerificationResult;
+    protected _algorithm:   string = '';
+    protected _cryptosuite: string = '';
+    protected _hash:        string = '';
+    protected _curve:       string = '';
+    // The extra initialization is here to make deno happy.
+    // In fact, it is initialized in the constructor via
+    // the call to `initResults()`
+    protected _result: VerificationResult = {
+        verified: false,
+        verifiedDocument: null,
+        warnings: [],
+        errors: []
+    };
 
     constructor() {
         this._hash = "SHA-256";
@@ -154,7 +160,7 @@ abstract class DataIntegrity {
         // Calculate the hash of the dataset, and sign the hash with the secret key
         // This is the "core"...
         const signHashValue = async (): Promise<string> => {
-            const key: CryptoKey = await this.importKey(keyPair.private, Confidentiality.secret);
+            const key: CryptoKey|null = await this.importKey(keyPair.private, Confidentiality.secret);
             if (key === null) {
                 return "";
             } else {
@@ -237,13 +243,13 @@ abstract class DataIntegrity {
      * @returns 
      */
     protected async verifyAProofGraph(hash: string, proof: n3.Store, proofId?: rdf.Quad_Graph): Promise<boolean> {
-        let localErrors   : errors.ProblemDetail[] = [];
-        let localWarnings : errors.ProblemDetail[] = [];
+        const localErrors   : errors.ProblemDetail[] = [];
+        const localWarnings : errors.ProblemDetail[] = [];
 
         // Verify the signature by check signature of the hash with the key
         // This is the "core"...
         const checkHashValue = async (proof_value: string, key_jwk: JsonWebKey): Promise<boolean> => {
-            const key: CryptoKey = await this.importKey(key_jwk, Confidentiality.public);
+            const key: CryptoKey|null = await this.importKey(key_jwk, Confidentiality.public);
             const signature_array: ArrayBuffer = base64UrlToArrayBuffer(proof_value.slice(1));
             const data: ArrayBuffer = textToArrayBuffer(hash);
             if (key === null) {
@@ -346,8 +352,8 @@ abstract class DataIntegrity {
 
         // Retrieve necessary values with checks
         checkProofPurposes(proof);
-        const publicKey: JsonWebKey = getPublicKey(proof);
-        const proofValue: string = getProofValue(proof);
+        const publicKey: JsonWebKey | null = getPublicKey(proof);
+        const proofValue: string | null = getProofValue(proof);
 
         // The final set of error/warning should be modified with the proof graph's ID, if applicable
         if (proofId) {

@@ -4,10 +4,9 @@
  */
 
 import { RDFC10 } from 'rdfjs-c14n';
-import base64url  from 'base64url';
 import * as rdf   from '@rdfjs/types';
 import * as n3    from 'n3';
-const { namedNode, literal, quad } = n3.DataFactory;
+const { namedNode } = n3.DataFactory;
 
 /***************************************************************************************
  * Namespace handling
@@ -81,7 +80,10 @@ export class DatasetMap {
      */
     item(graph: rdf.Quad_Graph): n3.Store {
         if (this.index.has(graph.value)) {
-            return this.index.get(graph.value).dataset;
+            // The '?' operator is to make deno happy. By virtue of the 
+            // test we know that the value cannot be undefined, but
+            // the deno checker does not realize this...
+            return this.index.get(graph.value)?.dataset;
         } else {
             const dataset = new n3.Store();
             this.index.set(graph.value, {
@@ -109,6 +111,17 @@ export class DatasetMap {
 /*****************************************************************************************
  * Misc Utility Functions
  *****************************************************************************************/
+/*
+These two came from perplexity, hopefully it is correct...
+ */
+
+const base64ToUrl = (base64String: string): string => {
+    return base64String.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+};
+
+const urlToBase64 = (base64Url: string): string => {
+    return base64Url.replace(/-/g, '+').replace(/_/g, '/');
+};
 
 /**
  * Type guard to check if an object implements the rdf.DatasetCore interface.
@@ -161,7 +174,7 @@ export function arrayBufferToBase64Url(arrayBuffer: ArrayBuffer): string {
     }
     const base64String = btoa(binary);
 
-    return base64url.fromBase64(base64String);
+    return base64ToUrl(base64String);
 }
 
 /**
@@ -173,7 +186,7 @@ export function arrayBufferToBase64Url(arrayBuffer: ArrayBuffer): string {
  * @returns 
  */
 export function base64UrlToArrayBuffer(url: string): ArrayBuffer {
-    const base64string = base64url.toBase64(url);
+    const base64string = urlToBase64(url);
 
     const binary = atob(base64string);
 

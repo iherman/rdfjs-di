@@ -1,5 +1,7 @@
-import * as rdf    from '@rdfjs/types';
-import { Command } from 'commander';
+import * as rdf     from '@rdfjs/types';
+import { Command }  from 'commander';
+import * as process from 'node:process';
+
 
 import { KeyPair, DI_ECDSA, VerificationResult } from '../../index';
 import { get_quads, DataFactory, write_quads } from './rdfn3';
@@ -31,7 +33,7 @@ async function main() {
     const program = new Command();
     program
         .name('main [testfile]')
-        .description('Make a roundrip for signing and verifying')
+        .description('Make a roundtrip for signing and verifying')
         .usage('[options] [file name]')
         .option('-a --anchor', 'Anchor the proof graph to the file name (if relevant)')
         .option('-e --embed',  'Create an embedded proof')

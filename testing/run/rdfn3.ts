@@ -8,7 +8,7 @@
 
 import * as n3                   from 'n3';
 import * as rdf                  from '@rdfjs/types';
-import * as fs                   from 'fs';
+import * as fs                   from 'node:fs';
 import { pipeline }              from 'node:stream/promises';
 
 /**
@@ -20,10 +20,11 @@ export function dataset_to_nquads(quads: Iterable<rdf.Quad>): string[] {
     const n3Writer = new n3.Writer();
     const quad_to_nquad = (quad: rdf.Quad): string => {
         const retval = n3Writer.quadToString(quad.subject, quad.predicate, quad.object, quad.graph);
+        // deno-lint-ignore no-regex-spaces
         return retval.endsWith('  .') ? retval.replace(/  .$/, ' .') : retval;
     };
 
-    let retval: string[] = [];
+    const retval: string[] = [];
     for (const quad of quads) {
         retval.push(quad_to_nquad(quad));
     }
@@ -62,7 +63,8 @@ const prefixes = {
 export function write_quads(dataset: rdf.DatasetCore) {
     const writer = new n3.Writer( {prefixes: prefixes});
     for (const q of dataset) writer.addQuad(q);
-    writer.end((error, result) => console.log(result));
+    // deno-lint-ignore no-explicit-any
+    writer.end((_error: any, result: any) => console.log(result));
 }
 
 
