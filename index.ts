@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-inferrable-types
 /// <reference types="node" />
 import * as rdf          from '@rdfjs/types';
 import * as n3           from 'n3';
