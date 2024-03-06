@@ -13,32 +13,12 @@ import {
 // n3.DataFactory is a namespace with some functions...
 const { namedNode, literal, quad } = n3.DataFactory;
 
-/** Values used internally for the crypto functions; they are defined by the WebCrypto spec. */
-export enum Confidentiality {
-    public = "public",
-    secret = "secret"
-}
+import { Cryptosuites, Cryptosuite, SuiteMetadata, VerificationResult } from './lib/common';
+export { Cryptosuites, Cryptosuite, SuiteMetadata, VerificationResult } from './lib/common';
 
-export interface VerificationResult {
-    verified         : boolean,
-    verifiedDocument : rdf.DatasetCore | null,
-    warnings         : ProblemDetail[]; 
-    errors           : ProblemDetail[];
-}
+export { generateKey, KeyPair } from './lib/crypto_utils';
+import { KeyPair } from './lib/crypto_utils';
 
-/**
- * Crypto key pair. The keys are stored in JWK format.
- * At the moment, this seems the dominant format for keys in WebCrypto.
- * 
- * The values for controller, expires, and revoked, are all optional (see spec for details)
- */
-export interface KeyPair {
-    public      : JsonWebKey,
-    private     : JsonWebKey,
-    controller ?: string,
-    expires    ?: string,
-    revoked    ?: string,
-}
 
 /**
  * Type guard to check if an object implements the KeyPair interface.

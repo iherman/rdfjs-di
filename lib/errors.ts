@@ -24,6 +24,11 @@ export abstract class ProblemDetail  {
     }
 }
 
+export interface Errors {
+    warnings: ProblemDetail[];
+    errors:   ProblemDetail[];
+} 
+
 export class Proof_Generation_Error extends ProblemDetail {
     constructor(detail: string) {
         super(detail,'Proof generation error', -16);
@@ -47,4 +52,11 @@ export class Invalid_Verification_Method extends ProblemDetail {
         super(detail, 'Invalid verification method', -24);
     }
 }
+
+export class Unclassified_Error extends ProblemDetail {
+    constructor(detail: string) {
+        super(detail, 'Unclassified error', -100);
+    }
+}
+
 
