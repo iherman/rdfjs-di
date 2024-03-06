@@ -6,6 +6,7 @@
 import { RDFC10 } from 'rdfjs-c14n';
 import * as rdf   from '@rdfjs/types';
 import * as n3    from 'n3';
+import { KeyPair } from './common';
 const { namedNode } = n3.DataFactory;
 
 /***************************************************************************************
@@ -108,20 +109,20 @@ export class DatasetMap {
 }
 
 
-/*****************************************************************************************
- * Misc Utility Functions
- *****************************************************************************************/
-/*
-These two came from perplexity, hopefully it is correct...
- */
+// /*****************************************************************************************
+//  * Misc Utility Functions
+//  *****************************************************************************************/
+// /*
+// These two came from perplexity, hopefully it is correct...
+//  */
 
-const base64ToUrl = (base64String: string): string => {
-    return base64String.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-};
+// const base64ToUrl = (base64String: string): string => {
+//     return base64String.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+// };
 
-const urlToBase64 = (base64Url: string): string => {
-    return base64Url.replace(/-/g, '+').replace(/_/g, '/');
-};
+// const urlToBase64 = (base64Url: string): string => {
+//     return base64Url.replace(/-/g, '+').replace(/_/g, '/');
+// };
 
 /**
  * Type guard to check if an object implements the rdf.DatasetCore interface.
@@ -136,13 +137,25 @@ export function isDatasetCore(obj: any): obj is rdf.DatasetCore {
         (obj as rdf.DatasetCore).has !== undefined;
 }
 
+
 /**
- * Text to array buffer, needed for crypto operations
- * @param text
+ * Type guard to check if an object implements the KeyPair interface.
+ * 
+ * @param obj 
+ * @returns 
  */
-export function textToArrayBuffer(text: string): ArrayBuffer {
-    return (new TextEncoder()).encode(text).buffer;
+export function isKeyPair(obj: any): obj is KeyPair {
+    return (obj as KeyPair).public !== undefined && (obj as KeyPair).private !== undefined;
 }
+
+
+// /**
+//  * Text to array buffer, needed for crypto operations
+//  * @param text
+//  */
+// export function textToArrayBuffer(text: string): ArrayBuffer {
+//     return (new TextEncoder()).encode(text).buffer;
+// }
 
 /**
  * Calculate the canonical hash of a dataset using the implementation of RDFC 1.0.
@@ -157,46 +170,46 @@ export async function calculateDatasetHash(dataset: rdf.DatasetCore): Promise<st
     return datasetHash;
 }
 
-/**
- * Convert an array buffer to a base64url value.
- * 
- * (Created with the help of chatgpt...)
- * 
- * @param arrayBuffer 
- * @returns 
- */
-export function arrayBufferToBase64Url(arrayBuffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(arrayBuffer);
+// /**
+//  * Convert an array buffer to a base64url value.
+//  * 
+//  * (Created with the help of chatgpt...)
+//  * 
+//  * @param arrayBuffer 
+//  * @returns 
+//  */
+// export function arrayBufferToBase64Url(arrayBuffer: ArrayBuffer): string {
+//     const bytes = new Uint8Array(arrayBuffer);
 
-    let binary: string = "";
-    for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    const base64String = btoa(binary);
+//     let binary: string = "";
+//     for (let i = 0; i < bytes.length; i++) {
+//         binary += String.fromCharCode(bytes[i]);
+//     }
+//     const base64String = btoa(binary);
 
-    return base64ToUrl(base64String);
-}
+//     return base64ToUrl(base64String);
+// }
 
-/**
- * Convert a base64url value to an array buffer
- * 
- * (Created with the help of chatgpt...)
- * 
- * @param url 
- * @returns 
- */
-export function base64UrlToArrayBuffer(url: string): ArrayBuffer {
-    const base64string = urlToBase64(url);
+// /**
+//  * Convert a base64url value to an array buffer
+//  * 
+//  * (Created with the help of chatgpt...)
+//  * 
+//  * @param url 
+//  * @returns 
+//  */
+// export function base64UrlToArrayBuffer(url: string): ArrayBuffer {
+//     const base64string = urlToBase64(url);
 
-    const binary = atob(base64string);
+//     const binary = atob(base64string);
 
-    const byteArray = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        byteArray[i] = binary.charCodeAt(i);
-    }
+//     const byteArray = new Uint8Array(binary.length);
+//     for (let i = 0; i < binary.length; i++) {
+//         byteArray[i] = binary.charCodeAt(i);
+//     }
 
-    return byteArray.buffer;
-}
+//     return byteArray.buffer;
+// }
 
 
 /**
@@ -227,8 +240,8 @@ export function convertToStore(dataset: rdf.DatasetCore): n3.Store {
 }
 
 /*****************************************************************************************
- * This is only used for debugging!!!!
- *****************************************************************************************/
+ *  This is only used for debugging!!!!
+*****************************************************************************************/
 
 const prefixes = {
     sec: "https://w3id.org/security#",

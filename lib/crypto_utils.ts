@@ -7,10 +7,10 @@ export interface KeyPair {
     private: JsonWebKey,
 }
 
-type Alg = "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512";
-type Crv = "P-256" | "P-384" | "P-521";
-type Hsh = "SHA-256" | "SHA-384" | "SHA-512";
-type Kty = "EC" | "RSA";
+export type Alg = "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512";
+export type Crv = "P-256" | "P-384" | "P-521";
+export type Hsh = "SHA-256" | "SHA-384" | "SHA-512";
+export type Kty = "EC" | "RSA";
 
 interface WebCryptoAPIData {
     name:         string,

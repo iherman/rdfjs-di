@@ -1,4 +1,4 @@
-import { ProblemDetail, Errors } from './errors';
+import { Errors }                from './errors';
 import { KeyPair }               from './crypto_utils';
 export { KeyPair }               from './crypto_utils';
 import * as rdf                  from '@rdfjs/types';
@@ -31,3 +31,4 @@ export interface Cryptosuite extends KeyPair, SuiteMetadata {
     cryptosuite: string;
     created:     string;
 }
+
