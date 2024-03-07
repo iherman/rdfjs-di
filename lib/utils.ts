@@ -1,12 +1,19 @@
 /**
- * Collection of smaller utilities needed for the DI implementation. Put into a separate file for an easier maintenance; not meant
- * to be part of the external API
+ * Collection of smaller utilities needed for the DI implementation. 
+ * 
+ * Put into a separate file for an easier maintenance; not meant
+ * to be part of the external API.
+ * They are not exported (via `index.ts`) to
+ * package users.
+ * 
+ * @packageDocumentation
+ * 
  */
 
 import { RDFC10 } from 'rdfjs-c14n';
 import * as rdf   from '@rdfjs/types';
 import * as n3    from 'n3';
-import { KeyPair } from './common';
+import { KeyPair, KeyMetadata } from './types';
 const { namedNode } = n3.DataFactory;
 
 /***************************************************************************************
@@ -109,20 +116,9 @@ export class DatasetMap {
 }
 
 
-// /*****************************************************************************************
-//  * Misc Utility Functions
-//  *****************************************************************************************/
-// /*
-// These two came from perplexity, hopefully it is correct...
-//  */
-
-// const base64ToUrl = (base64String: string): string => {
-//     return base64String.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-// };
-
-// const urlToBase64 = (base64Url: string): string => {
-//     return base64Url.replace(/-/g, '+').replace(/_/g, '/');
-// };
+/*****************************************************************************************
+ * Misc Utility Functions
+ *****************************************************************************************/
 
 /**
  * Type guard to check if an object implements the rdf.DatasetCore interface.
@@ -144,18 +140,9 @@ export function isDatasetCore(obj: any): obj is rdf.DatasetCore {
  * @param obj 
  * @returns 
  */
-export function isKeyPair(obj: any): obj is KeyPair {
+export function isKeyData(obj: any): obj is KeyMetadata {
     return (obj as KeyPair).public !== undefined && (obj as KeyPair).private !== undefined;
 }
-
-
-// /**
-//  * Text to array buffer, needed for crypto operations
-//  * @param text
-//  */
-// export function textToArrayBuffer(text: string): ArrayBuffer {
-//     return (new TextEncoder()).encode(text).buffer;
-// }
 
 /**
  * Calculate the canonical hash of a dataset using the implementation of RDFC 1.0.
@@ -169,48 +156,6 @@ export async function calculateDatasetHash(dataset: rdf.DatasetCore): Promise<st
     const datasetHash: string = await rdfc10.hash(canonical_quads);
     return datasetHash;
 }
-
-// /**
-//  * Convert an array buffer to a base64url value.
-//  * 
-//  * (Created with the help of chatgpt...)
-//  * 
-//  * @param arrayBuffer 
-//  * @returns 
-//  */
-// export function arrayBufferToBase64Url(arrayBuffer: ArrayBuffer): string {
-//     const bytes = new Uint8Array(arrayBuffer);
-
-//     let binary: string = "";
-//     for (let i = 0; i < bytes.length; i++) {
-//         binary += String.fromCharCode(bytes[i]);
-//     }
-//     const base64String = btoa(binary);
-
-//     return base64ToUrl(base64String);
-// }
-
-// /**
-//  * Convert a base64url value to an array buffer
-//  * 
-//  * (Created with the help of chatgpt...)
-//  * 
-//  * @param url 
-//  * @returns 
-//  */
-// export function base64UrlToArrayBuffer(url: string): ArrayBuffer {
-//     const base64string = urlToBase64(url);
-
-//     const binary = atob(base64string);
-
-//     const byteArray = new Uint8Array(binary.length);
-//     for (let i = 0; i < binary.length; i++) {
-//         byteArray[i] = binary.charCodeAt(i);
-//     }
-
-//     return byteArray.buffer;
-// }
-
 
 /**
  * Create and store the values in a dataset in a new n3 Store. This may be

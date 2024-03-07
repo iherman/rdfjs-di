@@ -1,9 +1,17 @@
 /**
- * Collection of smaller utilities needed for the DI implementation. Put into a separate file for an easier maintenance; not meant
- * to be part of the external API
+ * Collection of smaller utilities needed for the DI implementation.
+ *
+ * Put into a separate file for an easier maintenance; not meant
+ * to be part of the external API.
+ * They are not exported (via `index.ts`) to
+ * package users.
+ *
+ * @packageDocumentation
+ *
  */
 import * as rdf from '@rdfjs/types';
 import * as n3 from 'n3';
+import { KeyMetadata } from './types';
 /***************************************************************************************
  * Namespace handling
  **************************************************************************************/
@@ -60,10 +68,12 @@ export declare class DatasetMap {
  */
 export declare function isDatasetCore(obj: any): obj is rdf.DatasetCore;
 /**
- * Text to array buffer, needed for crypto operations
- * @param text
+ * Type guard to check if an object implements the KeyPair interface.
+ *
+ * @param obj
+ * @returns
  */
-export declare function textToArrayBuffer(text: string): ArrayBuffer;
+export declare function isKeyData(obj: any): obj is KeyMetadata;
 /**
  * Calculate the canonical hash of a dataset using the implementation of RDFC 1.0.
  *
@@ -71,24 +81,6 @@ export declare function textToArrayBuffer(text: string): ArrayBuffer;
  * @returns
  */
 export declare function calculateDatasetHash(dataset: rdf.DatasetCore): Promise<string>;
-/**
- * Convert an array buffer to a base64url value.
- *
- * (Created with the help of chatgpt...)
- *
- * @param arrayBuffer
- * @returns
- */
-export declare function arrayBufferToBase64Url(arrayBuffer: ArrayBuffer): string;
-/**
- * Convert a base64url value to an array buffer
- *
- * (Created with the help of chatgpt...)
- *
- * @param url
- * @returns
- */
-export declare function base64UrlToArrayBuffer(url: string): ArrayBuffer;
 /**
  * Convert the dataset into an n3.Store, unless it is already a store.
  * This is done to manage the various quads more efficiently.

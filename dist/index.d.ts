@@ -1,149 +1,83 @@
+/**
+ * Externally visible API level for the package.
+ *
+ *
+ * @packageDocumentation
+ */
 import * as rdf from '@rdfjs/types';
-import * as n3 from 'n3';
-import { ProblemDetail } from './lib/errors';
-export { ProblemDetail } from './lib/errors';
-/** Values used internally for the crypto functions; they are defined by the WebCrypto spec. */
-export declare enum Confidentiality {
-    public = "public",
-    secret = "secret"
-}
-export interface VerificationResult {
-    verified: boolean;
-    verifiedDocument: rdf.DatasetCore;
-    warnings: ProblemDetail[];
-    errors: ProblemDetail[];
-}
+import { KeyData, VerificationResult } from './lib/types';
+export { KeyData, VerificationResult, KeyMetadata, Cryptosuites } from './lib/types';
+export { generateKey, KeyDetails } from './lib/crypto_utils';
 /**
- * Crypto key pair. The keys are stored in JWK format.
- * At the moment, this seems the dominant format for keys in WebCrypto.
+ * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in
+ * multibase format, using base64url encoding. Keys are accepted, and stored in JWK format.
  *
- * The values for controller, expires, and revoked, are all optional (see spec for details)
+ * @param dataset
+ * @param keyData
+ * @throws - an error if there was a key issue while signing.
+ * @returns
  */
-export interface KeyPair {
-    public: JsonWebKey;
-    private: JsonWebKey;
-    controller?: string;
-    expires?: string;
-    revoked?: string;
-}
-/*****************************************************************************************
- * The real meat...
- *****************************************************************************************/
+export declare function generateProofGraph(dataset: rdf.DatasetCore, keyData: Iterable<KeyData>): Promise<rdf.DatasetCore[]>;
+export declare function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyData): Promise<rdf.DatasetCore>;
 /**
- * Subclasses are supposed to set the right algorithm, cryptosuite, etc, names.
+ * Verify the separate proof graph.
  *
+ * The validity result is the conjunction of the validation result for each proof graphs separately.
+ *
+ * The following checks are made:
+ *
+ * 1. There should be exactly one [proof value](https://www.w3.org/TR/vc-data-integrity/#dfn-proofvalue)
+ * 2. There should be exactly one [verification method](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod), which should be a separate resource containing the key (in JWK)
+ * 3. The key's (optional) [expiration](https://www.w3.org/TR/vc-data-integrity/#defn-proof-expires) and
+ * [revocation](https://www.w3.org/TR/vc-data-integrity/#dfn-revoked) dates are checked and compared to the current time which should be "before"
+ * 4. The proof's [creation date](https://www.w3.org/TR/vc-data-integrity/#dfn-created) must be before the current time
+ * 5. The proof [purpose(s)](https://www.w3.org/TR/vc-data-integrity/#dfn-proofpurpose) must be set, and the values are either [authentication](https://www.w3.org/TR/vc-data-integrity/#dfn-authentication) or [verification](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod)
+ *
+ * If any of those errors are found, the validation result is `false`. The error reports themselves, with some more details, are part of the verification result structure.
+ *
+ * @param dataset
+ * @param proofGraph
+ * @returns
  */
-declare abstract class DataIntegrity {
-    protected _algorithm: string;
-    protected _cryptosuite: string;
-    protected _hash: string;
-    protected _curve: string;
-    protected _result: VerificationResult;
-    constructor();
-    protected initResults(): void;
-    /**************************************************************************************************/
-    /**************************************************************************************************/
-    /**
-     * Import a JWK encoded key into a key usable by crypto.subtle.
-     *
-     * @param key - the key itself
-     * @param type - whether this is a private or public key (usable to sign or verify, respectively)
-     *
-     * @returns
-     */
-    protected importKey(key: JsonWebKey, type: Confidentiality): Promise<CryptoKey | null>;
-    /**
-     * Generate a (separate) proof graph, per the DI spec. The signature is stored in
-     * multibase format, using base64url encoding.
-     *
-     * @param hashValue - this is the value of the Dataset's canonical hash
-     * @param keyPair
-     * @returns
-     */
-    protected generateAProofGraph(hashValue: string, keyPair: KeyPair): Promise<rdf.DatasetCore>;
-    /**
-     * Check one proof graph, ie, whether the included signature corresponds to the hash value.
-     *
-     * The following checks are also made and, possibly, exception are raised with errors according to
-     * the DI standard:
-     *
-     * 1. There should be exactly one proof value
-     * 2. There should be exactly one verification method, which should be a separate resource containing the key
-     * 3. The key's possible expiration and revocation dates are checked and compared to the current time which should be
-     * "before"
-     * 4. The proof's creation date must be before the current time
-     * 5. The proof purpose(s) must be set, and the values are either authentication or verification
-     *
-     * @param hash
-     * @param proof
-     * @returns
-     */
-    protected verifyAProofGraph(hash: string, proof: n3.Store, proofId?: rdf.Quad_Graph): Promise<boolean>;
-    /**
-     * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in
-     * multibase format, using base64url encoding.
-     *
-     * This is just a wrapper around {@link generateAProofGraph} to take care of multiple key pairs.
-     *
-     * @param dataset
-     * @param keyPair
-     * @throws - an error if there was a key issue while signing.
-     * @returns
-     */
-    generateProofGraph(dataset: rdf.DatasetCore, keyPair: Iterable<KeyPair>): Promise<rdf.DatasetCore[]>;
-    generateProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair): Promise<rdf.DatasetCore>;
-    /**
-     * Verify the separate proof graph.
-     *
-     * For now, this methods just does the minimum as a proof of concept. A more elaborate version will have
-     * to verify all details of the proof graph.
-     *
-     * @param dataset
-     * @param proofGraph
-     * @returns
-     */
-    verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore): Promise<boolean>;
-    verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore[]): Promise<boolean[]>;
-    /**
-     * Create a new dataset with the copy of the original and the proof graph as a separate graph within the
-     * dataset.
-     *
-     * The separate quad with the `proof` property is added; if the anchor is properly defined, then that
-     * will be the subject, otherwise a new blank node. (The latter may be meaningless, but makes it easier
-     * to find the proof graph for verification.)
-     *
-     * If the `keyPair` argument is an Array, then the proof graphs are considered to be a Proof Chain. Otherwise,
-     * (e.g., if it is a Set), it is a Proof Set.
-     *
-     * Just wrapper around {@link generateProofGraph}.
-     * @param dataset
-     * @param keyPair
-     * @param anchor
-     * @returns
-     */
-    embedProofGraph(dataset: rdf.DatasetCore, keyPair: KeyPair | Iterable<KeyPair>, anchor?: rdf.Quad_Subject): Promise<rdf.DatasetCore>;
-    /**
-     * Verify the dataset with embedded proof graphs. The individual proof graphs are identified by the presence
-     * of a type relationship to `DataIntegrityProof`; the result is the conjunction of the validation result for
-     * each proof graphs separately.
-     *
-     * The following checks are also made and, possibly, exception are raised with errors according to
-     * the DI standard:
-     *
-     * 1. There should be exactly one proof value
-     * 2. There should be exactly one verification method, which should be a separate resource containing the key
-     * 3. The key's possible expiration and revocation dates are checked and compared to the current time which should be "before"
-     * 4. The proof's creation date must be before the current time
-     * 5. The proof purpose(s) must be set, and the values are either authentication or verification
-
-     * @param dataset
-     * @returns
-     */
-    verifyEmbeddedProofGraph(dataset: rdf.DatasetCore): Promise<VerificationResult>;
-}
+export declare function verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore | rdf.DatasetCore[]): Promise<VerificationResult>;
 /**
- * Real instantiation of a DI cryptosuite: ecdsa-2022.
+ * Create a new dataset with the copy of the original and the proof graph(s) as a separate graph(s) within the
+ * dataset (a.k.a. "Embedded Proof" in the DI spec terminology).
+ *
+ * If the anchor is defined, then that will be the subject for quads with the `proof` property is added (one for each proof graph).
+ *
+ * If the `keyPair` argument is an Array, then the proof graphs are considered to be a Proof Chain. Otherwise,
+ * (e.g., if it is a Set), it is a Proof Set.
+ *
+ * @param dataset
+ * @param keyData
+ * @param anchor
+ * @returns
  */
-export declare class DI_ECDSA extends DataIntegrity {
-    constructor();
-}
+export declare function embedProofGraph(dataset: rdf.DatasetCore, keyData: KeyData | Iterable<KeyData>, anchor?: rdf.Quad_Subject): Promise<rdf.DatasetCore>;
+/**
+ * Verify the dataset with embedded proof graph(s).
+ *
+ * If the anchor is present, the proof graphs are identified by the object terms of the corresponding [`proof`](https://www.w3.org/TR/vc-data-integrity/#proofs) quads.
+ * Otherwise, the type relationship to [`DataIntegrityProof`](https://www.w3.org/TR/vc-data-integrity/#dataintegrityproof) are considered. Note that if no anchor is provided, this second choice
+ * may lead to erroneous results because some of the embedded proof graphs are not meant to be a proof for the full dataset. (This may
+ * be the case in a ["Verifiable Presentation" style datasets](https://www.w3.org/TR/vc-data-model-2.0/#presentations-0).)
+ *
+ * The validity result is the conjunction of the validation result for each proof graphs separately.
+ *
+ * The following checks are also made.
+ *
+ * 1. There should be exactly one [proof value](https://www.w3.org/TR/vc-data-integrity/#dfn-proofvalue)
+ * 2. There should be exactly one [verification method](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod), which should be a separate resource containing the key (in JWK)
+ * 3. The key's (optional) [expiration](https://www.w3.org/TR/vc-data-integrity/#defn-proof-expires) and
+ * [revocation](https://www.w3.org/TR/vc-data-integrity/#dfn-revoked) dates are checked and compared to the current time which should be "before"
+ * 4. The proof's [creation date](https://www.w3.org/TR/vc-data-integrity/#dfn-created) must be before the current time
+ * 5. The proof [purpose(s)](https://www.w3.org/TR/vc-data-integrity/#dfn-proofpurpose) must be set, and the values are either [authentication](https://www.w3.org/TR/vc-data-integrity/#dfn-authentication) or [verification](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod)
+ *
+ * If any of those errors occur, the overall validity result is `false`. The error reports themselves, with some more details, are part of the verification result structure.
+ *
+ * @param dataset
+ * @param anchor
+ * @returns
+*/
+export declare function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?: rdf.Quad_Subject): Promise<VerificationResult>;

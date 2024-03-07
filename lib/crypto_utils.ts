@@ -1,15 +1,30 @@
-import { Errors }  from "./errors";
-import * as errors from "./errors";
-import { SuiteMetadata, Cryptosuite, Cryptosuites } from './common';
+/**
+ * "Internal API" to the WebCrypto facilities.
+ * 
+ * Put into a separate file for an easier maintenance; not meant
+ * to be part of the external API.
+ * Most of them are not exported (via `index.ts`) to
+ * package users.
+ * 
+ * Note that, at the moment, the "interchange format" for keys is restricted to JWK. One
+ * area of improvement may be to allow for other formats (the DI standard refers to Multikey).
+ * 
+ * @packageDocumentation
+ */
 
-export interface KeyPair {
-    public: JsonWebKey,
-    private: JsonWebKey,
-}
+import * as types from "./types";
+import { KeyMetadata, KeyData, Cryptosuites, KeyPair, Errors } from './types';
 
+/** JWK values for the algorithms that are relevant for this package */
 export type Alg = "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512";
+
+/** JWK values for the elliptic curves that are relevant for this package */
 export type Crv = "P-256" | "P-384" | "P-521";
+
+/** JWK values for the hash methods that are relevant for this package */
 export type Hsh = "SHA-256" | "SHA-384" | "SHA-512";
+
+/** JWK values for the key types that are relevant for this package */
 export type Kty = "EC" | "RSA";
 
 interface WebCryptoAPIData {
@@ -19,7 +34,8 @@ interface WebCryptoAPIData {
     namedCurve ?: Crv;
 }
 
-export interface Cryptodata {
+/** Information that may be used when generating new keys */
+export interface KeyDetails {
     namedCurve?:    Crv,
     hash?:          Hsh,
     modulusLength?: number;
@@ -31,7 +47,7 @@ export interface Cryptodata {
  * 
 ***********************************************************************************/
 
-// Default values for keys, some of them can be overwritten
+/** Default values for keys, some of them can be overwritten */
 const SALT_LENGTH             = 32;
 const DEFAULT_MODUS_LENGTH    = 2048;
 const DEFAULT_HASH            = "SHA-256";
@@ -63,14 +79,14 @@ function algorithmData(report: Errors, key: JsonWebKey): WebCryptoAPIData | null
             return {
                 name:       "ECDSA",
                 namedCurve: key.crv as Crv,
-                hash:       "SHA-256"
+                hash:       DEFAULT_HASH
             }
         }
         case "RSA" : {
             try {
                 return RsaAlgs[key.alg as Alg];
             } catch (e) {
-                report.errors.push(new errors.Unclassified_Error(`Key's error in 'alg': ${e.message}`));
+                report.errors.push(new types.Unclassified_Error(`Key's error in 'alg': ${e.message}`));
                 return null;
             }
         }
@@ -189,7 +205,7 @@ export async function sign(report: Errors, message: string, secretKey: JsonWebKe
             // Turn the the signature into Base64URL, and the into multicode
             return `u${arrayBufferToBase64Url(rawSignature)}`;
         } catch(e) {
-            report.errors.push(new errors.Proof_Generation_Error(e.message));
+            report.errors.push(new types.Proof_Generation_Error(e.message));
             return null;
         }
     }
@@ -200,15 +216,16 @@ export async function sign(report: Errors, message: string, secretKey: JsonWebKe
  * 
  * Possible errors are added to the report, no exceptions should be thrown.
  * 
- * @param report 
+ * @param report - placeholder for error reports
  * @param message 
- * @param secretKey 
+ * @param signature
+ * @param publicKey 
  * @returns 
  */
 export async function verify(report: Errors, message: string, signature: string, publicKey: JsonWebKey): Promise<boolean> {
     const rawMessage: ArrayBuffer = textToArrayBuffer(message);
     if (signature.length === 0 || signature[0] !== 'u') {
-        report.errors.push(new errors.Malformed_Proof_Error(`Signature is of an incorrect format (${signature})`));
+        report.errors.push(new types.Malformed_Proof_Error(`Signature is of an incorrect format (${signature})`));
         return false;
     }
     const rawSignature: ArrayBuffer = base64UrlToArrayBuffer(signature.slice(1));
@@ -224,77 +241,78 @@ export async function verify(report: Errors, message: string, signature: string,
             const retval: boolean = await crypto.subtle.verify(algorithm, key, rawSignature, rawMessage);
             return retval;
         } catch(e) {
-            report.errors.push(new errors.Proof_Generation_Error(e.message));
+            report.errors.push(new types.Proof_Generation_Error(e.message));
             return false;
         }
     }
 }
 
 /**
- * Mapping from the JWK data to the corresponding cryptosuite identifier.
+ * Mapping from the JWK data to the corresponding DI cryptosuite identifier.
  * 
- * @param report 
+ * @param report - placeholder for error reports
  * @param keyPair 
  * @returns 
  */
-export function cryptosuite(report: Errors, keyPair: KeyPair): Cryptosuites | null {
+export function cryptosuiteId(report: Errors, keyPair: KeyPair): Cryptosuites | null {
     // Some elementary check
-    if (keyPair.private.kty !== keyPair.public.kty || 
-        keyPair.private.crv !== keyPair.public.crv || 
+    if (keyPair.private.kty !== keyPair.public.kty ||
+        keyPair.private.crv !== keyPair.public.crv ||
         keyPair.private.alg !== keyPair.private.alg) {
-        report.errors.push(new errors.Invalid_Verification_Method('Keys are not in pair'));
+        report.errors.push(new types.Invalid_Verification_Method('Keys are not in pair (in:\n ${JSON.stringify(keyPair,null,4)})'));
         return null;
     }
 
     const alg = algorithmData(report, keyPair.public);
     switch (alg.name) {
-        case "EC"                : return Cryptosuites.ecdsa;
-        case "RSA-PSS"           : return Cryptosuites.rsa_pss;
-        case "RSASSA-PKCS1-v1_5" : return Cryptosuites.rsa_ssa;
-        default                  : {
-            report.errors.push(new errors.Invalid_Verification_Method(`Unknown alg (${alg.name})`));
-            return null ;
+        case "ECDSA": return Cryptosuites.ecdsa;
+        case "RSA-PSS": return Cryptosuites.rsa_pss;
+        case "RSASSA-PKCS1-v1_5": return Cryptosuites.rsa_ssa;
+        default: {
+            report.errors.push(new types.Invalid_Verification_Method(`Unknown alg (${alg.name} in:\n ${JSON.stringify(keyPair,null,4)})`));
+            return null;
         }
     }
 }
 
 /**
- * Generate key pair to be used with DI in general
+ * Generate key pair to be used with DI in general. This function is not necessary for the core
+ * functionalities of the package, but may be useful for the package users. It is therefore 
+ * meant to be re-exported via the `index.ts` module.
  * 
  * @param metadata 
  * @param suite 
- * @param cryptodata 
+ * @param keyData 
  * @returns 
  */
-export async function generateKey(suite: Cryptosuites, metadata?: SuiteMetadata, cryptodata?: Cryptodata): Promise<Cryptosuite> {
+export async function generateKey(suite: Cryptosuites, metadata?: KeyMetadata, keyData?: KeyDetails): Promise<KeyData> {
     const suiteToAPI = (): any => {
         switch(suite) {
             case Cryptosuites.ecdsa : return {
                 name: "ECDSA",
-                namedCurve: cryptodata?.namedCurve || DEFAULT_CURVE,
+                namedCurve: keyData?.namedCurve || DEFAULT_CURVE,
             }
             case Cryptosuites.rsa_pss : return {
                 name: "RSA-PSS",
-                modulusLength: cryptodata?.modulusLength || DEFAULT_MODUS_LENGTH,
+                modulusLength: keyData?.modulusLength || DEFAULT_MODUS_LENGTH,
                 publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
-                hash: cryptodata?.hash || DEFAULT_HASH,
+                hash: keyData?.hash || DEFAULT_HASH,
             }
             case Cryptosuites.rsa_ssa: return {
                 name: 'RSASSA-PKCS1-v1_5',
-                modulusLength: cryptodata?.modulusLength || DEFAULT_MODUS_LENGTH,
+                modulusLength: keyData?.modulusLength || DEFAULT_MODUS_LENGTH,
                 publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
-                hash: cryptodata?.hash || DEFAULT_HASH,
+                hash: keyData?.hash || DEFAULT_HASH,
             }
         }
     }
 
-    const newPair = await crypto.subtle.generateKey(suiteToAPI(),true, ["sign", "verify"]);
+    const newPair = await crypto.subtle.generateKey(suiteToAPI(), true, ["sign", "verify"]);
     const keyPair = await toJWK(newPair);
-    const retval: Cryptosuite = {
+    const retval: KeyData = {
         public      : keyPair.public,
         private     : keyPair.private,
         cryptosuite : `${suite}`,
-        created     : (new Date()).toISOString(),
     }
     return {...retval, ...metadata};
 }

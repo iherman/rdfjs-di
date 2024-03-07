@@ -3,9 +3,11 @@ import { Command }  from 'commander';
 import * as process from 'node:process';
 
 
-import { KeyPair, DI_ECDSA, VerificationResult } from '../../index';
-import { get_quads, DataFactory, write_quads } from './rdfn3';
-import { get_keys, OSet }                      from './keys';
+import { KeyData, VerificationResult, 
+    generateProofGraph, verifyProofGraph, 
+    embedProofGraph, verifyEmbeddedProofGraph } from '../../index';
+import { get_quads, DataFactory, write_quads }  from './rdfn3';
+import { get_keys, OSet }                       from './keys';
 
 function displayVerificationResult(result: VerificationResult): void {
     console.log(`>>>> Verification result`);
@@ -56,36 +58,48 @@ async function main() {
     const input = (program.args.length === 0) ? 'small.ttl' : program.args[0];
     const anchor = options.anchor ? DataFactory.namedNode(`file:///${input}`) : undefined ;
 
-    const keyPairs: KeyPair[] = await get_keys();
-    // const keyPair = await generateKeys();
+    const keyPairs: KeyData[] = await get_keys();
     const dataset = await get_quads(input);
-    const di_ecdsa = new DI_ECDSA();
 
 
-    if (embed) {
-        const finalKeys = (proof_set) ? new OSet<KeyPair>(keyPairs) : ((proof_chain) ? keyPairs: keyPairs[0]);
-        if (!quiet) console.log(`>>> Generating embedded proofs for "${input}", with anchor at "${JSON.stringify(anchor)}"\n`);
-        const proof = await di_ecdsa.embedProofGraph(dataset, finalKeys, anchor);
-        if (!no_output) write_quads(proof);
-        if (verify) {
-            const result = await di_ecdsa.verifyEmbeddedProofGraph(proof);
-            if (!quiet) displayVerificationResult(result);
-        } else {
-            console.log(`>>> No verification was required`) 
-        }
-    } else {
-        let result: boolean[];
-        if (proof_set || proof_chain) {
-            const proofs: rdf.DatasetCore[] = await di_ecdsa.generateProofGraph(dataset, keyPairs);
-            result = (verify) ? await di_ecdsa.verifyProofGraph(dataset, proofs) : [false];
-            if (!no_output) for (const proof of proofs) write_quads(proof);
-        } else {
-            const keyPair: KeyPair = keyPairs[0];
-            const proof: rdf.DatasetCore = await di_ecdsa.generateProofGraph(dataset, keyPair);
-            result = (verify) ? [await di_ecdsa.verifyProofGraph(dataset, proof)] : [false];
+    try {
+        if (embed) {
+            const finalKeys = (proof_set) ? new OSet<KeyData>(keyPairs) : ((proof_chain) ? keyPairs: keyPairs[0]);
+            if (!quiet) console.log(`>>> Generating embedded proofs for "${input}", with anchor at "${JSON.stringify(anchor)}"\n`);
+            const proof = await embedProofGraph(dataset, finalKeys, anchor);
             if (!no_output) write_quads(proof);
+            if (verify) {
+                const result = await verifyEmbeddedProofGraph(proof, anchor);
+                if (!quiet) displayVerificationResult(result);
+            } else {
+                console.log(`>>> No verification was required`) 
+            }
+        } else {
+            let result: boolean[];
+            if (proof_set || proof_chain) {
+                const proofs: rdf.DatasetCore[] = await generateProofGraph(dataset, keyPairs);
+                if (verify) {
+                    const result = await verifyProofGraph(dataset, proofs);
+                    if (!quiet) displayVerificationResult(result);
+                } else {
+                    console.log(`>>> No verification was required`);
+                }
+                if (!no_output) for (const proof of proofs) write_quads(proof);
+            } else {
+                // Simplest alternative: single key, single output proof
+                const keyPair: KeyData = keyPairs[0];
+                const proof: rdf.DatasetCore = await generateProofGraph(dataset, keyPair);
+                if (verify) {
+                    const result = await verifyProofGraph(dataset, proof);
+                    if (!quiet) displayVerificationResult(result);
+                } else {
+                    console.log(`>>> No verification was required`);
+                }
+                if (!no_output) write_quads(proof);
+            }
         }
-        if (!quiet) console.log(verify ? `>>> Verification result: ${result}` : `>>> No verification was required`);
+    } catch(e) {
+        console.log(`${e.message}`);
     }
 }
 

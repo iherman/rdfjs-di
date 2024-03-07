@@ -1,9 +1,9 @@
 import { canonicalize } from "@tufjs/canonical-json";
 import * as fs          from 'node:fs/promises';
-import { KeyPair }      from '../../index';
+import { KeyData }      from '../../index';
 
 
-export async function get_keys(): Promise<KeyPair[]> {
+export async function get_keys(): Promise<KeyData[]> {
         const raw_keys: string = await fs.readFile('testing/keys.json', 'utf-8');
         return JSON.parse(raw_keys);
 } 

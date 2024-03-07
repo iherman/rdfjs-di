@@ -1,14 +1,20 @@
 "use strict";
 /**
- * Collection of smaller utilities needed for the DI implementation. Put into a separate file for an easier maintenance; not meant
- * to be part of the external API
+ * Collection of smaller utilities needed for the DI implementation.
+ *
+ * Put into a separate file for an easier maintenance; not meant
+ * to be part of the external API.
+ * They are not exported (via `index.ts`) to
+ * package users.
+ *
+ * @packageDocumentation
+ *
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.write_quads = exports.convertToStore = exports.base64UrlToArrayBuffer = exports.arrayBufferToBase64Url = exports.calculateDatasetHash = exports.textToArrayBuffer = exports.isDatasetCore = exports.DatasetMap = exports.createPrefix = void 0;
+exports.write_quads = exports.convertToStore = exports.calculateDatasetHash = exports.isKeyData = exports.isDatasetCore = exports.DatasetMap = exports.createPrefix = void 0;
 const rdfjs_c14n_1 = require("rdfjs-c14n");
-const base64url_1 = require("base64url");
 const n3 = require("n3");
-const { namedNode, literal, quad } = n3.DataFactory;
+const { namedNode } = n3.DataFactory;
 /***************************************************************************************
  * Namespace handling
  **************************************************************************************/
@@ -66,7 +72,10 @@ class DatasetMap {
      */
     item(graph) {
         if (this.index.has(graph.value)) {
-            return this.index.get(graph.value).dataset;
+            // The '?' operator is to make deno happy. By virtue of the 
+            // test we know that the value cannot be undefined, but
+            // the deno checker does not realize this...
+            return this.index.get(graph.value)?.dataset;
         }
         else {
             const dataset = new n3.Store();
@@ -105,13 +114,15 @@ function isDatasetCore(obj) {
 }
 exports.isDatasetCore = isDatasetCore;
 /**
- * Text to array buffer, needed for crypto operations
- * @param text
+ * Type guard to check if an object implements the KeyPair interface.
+ *
+ * @param obj
+ * @returns
  */
-function textToArrayBuffer(text) {
-    return (new TextEncoder()).encode(text).buffer;
+function isKeyData(obj) {
+    return obj.public !== undefined && obj.private !== undefined;
 }
-exports.textToArrayBuffer = textToArrayBuffer;
+exports.isKeyData = isKeyData;
 /**
  * Calculate the canonical hash of a dataset using the implementation of RDFC 1.0.
  *
@@ -125,42 +136,6 @@ async function calculateDatasetHash(dataset) {
     return datasetHash;
 }
 exports.calculateDatasetHash = calculateDatasetHash;
-/**
- * Convert an array buffer to a base64url value.
- *
- * (Created with the help of chatgpt...)
- *
- * @param arrayBuffer
- * @returns
- */
-function arrayBufferToBase64Url(arrayBuffer) {
-    const bytes = new Uint8Array(arrayBuffer);
-    let binary = "";
-    for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    const base64String = btoa(binary);
-    return base64url_1.default.fromBase64(base64String);
-}
-exports.arrayBufferToBase64Url = arrayBufferToBase64Url;
-/**
- * Convert a base64url value to an array buffer
- *
- * (Created with the help of chatgpt...)
- *
- * @param url
- * @returns
- */
-function base64UrlToArrayBuffer(url) {
-    const base64string = base64url_1.default.toBase64(url);
-    const binary = atob(base64string);
-    const byteArray = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        byteArray[i] = binary.charCodeAt(i);
-    }
-    return byteArray.buffer;
-}
-exports.base64UrlToArrayBuffer = base64UrlToArrayBuffer;
 /**
  * Create and store the values in a dataset in a new n3 Store. This may be
  * necessary because the methods are not supposed to modify the original
@@ -189,8 +164,8 @@ function convertToStore(dataset) {
 }
 exports.convertToStore = convertToStore;
 /*****************************************************************************************
- * This is only used for debugging!!!!
- *****************************************************************************************/
+ *  This is only used for debugging!!!!
+*****************************************************************************************/
 const prefixes = {
     sec: "https://w3id.org/security#",
     rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns",

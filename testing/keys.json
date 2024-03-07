@@ -5,6 +5,36 @@
                 "verify"
             ],
             "ext": true,
+            "kty": "RSA",
+            "n": "zX1p6Rl0kTtbFAiISqXQbT9U6kqqIFRfualifsLA5ZNFQMDvuw3cqYUqzIyHAVYV0Bps-mXmwFVjsetQIzqhE0X2VhJ8wBS-bGxm2_E0rQ9y35mN_dWfnVhJYtONrLjkduAk04Xouws60X2ye0QHhG63j0CLNj6bqJQ_fOE_ankHxjGnZ7H7tPIeJfj9Md2GMx98BEr_8iwFXPJ5zT3_ET1zdPUGJV3r6pTOTu5H6sH5457TxCeMIIZfQ3hn3f5lz_5JL5ahtIqZ1BgaAYt5bgg63oqmn67V1fmJ08tx1LT6BbGkt1WQBv8aNgm3Z5ztLWC8MJiqgeFpyQFUOIkVCQ",
+            "e": "AQAB",
+            "alg": "PS256"
+        },
+        "private": {
+            "key_ops": [
+                "sign"
+            ],
+            "ext": true,
+            "kty": "RSA",
+            "n": "zX1p6Rl0kTtbFAiISqXQbT9U6kqqIFRfualifsLA5ZNFQMDvuw3cqYUqzIyHAVYV0Bps-mXmwFVjsetQIzqhE0X2VhJ8wBS-bGxm2_E0rQ9y35mN_dWfnVhJYtONrLjkduAk04Xouws60X2ye0QHhG63j0CLNj6bqJQ_fOE_ankHxjGnZ7H7tPIeJfj9Md2GMx98BEr_8iwFXPJ5zT3_ET1zdPUGJV3r6pTOTu5H6sH5457TxCeMIIZfQ3hn3f5lz_5JL5ahtIqZ1BgaAYt5bgg63oqmn67V1fmJ08tx1LT6BbGkt1WQBv8aNgm3Z5ztLWC8MJiqgeFpyQFUOIkVCQ",
+            "e": "AQAB",
+            "d": "Rv6-AUGAsw6pTHYYNIYuSRhY66uJNKtB-WDKvVXnFEo54oHmMZ-77burCknA-Ra3aZM_tJFRVIEL9TQCF3HRpdmFnr47aJeiJM6dCP9Afkw4mYUxeBH-1_thO2ow6AxnLqUJRCVfP4RFOYyuhgT-feRMugsILeEaoXc6qhgec1en-aX19ifRhwY3-F25g58ybyZJiuOidUzUUr3l6WSsbN899OJTdAvWg-sujPzrQ-q-jrsKtw4aRz6mvXxQXQYEBiW5jP4HXjKN4dvtTPK1BVhCVXG2Hjvatic0Lnbdlwjx5Tuuu1fdwp6rGZpPI78tfrRX1ky6C77sOREtN71J6w",
+            "p": "5oChLrlHyJTI4X9RF_FrazEK9kKV5we4Rk7-qknjiFgBAJ0yWGWERG7c7k9Q-6fh2tEaGDd1KdEVlc-f6as9xYjJjWnP3i49CcIevwHf0iDAZqKi_r973R3FVHZwSasgYXCqjfhiXz-BouRfnIOcWCjkLx13ly7aVYvfFJCznKs",
+            "q": "5Dh6aW2PObDNxpRmWuCSmUtNVXXaMF8IUExmRzg0uFxtciJ_KPuD5uE2J2rr8khtO-dCjAGMVE8xUHJY1L5BSLz_HJoQ3D-oQRvf7_hiNA1EfG2PpGTjftVRe2SoykQKyqHuzEWYFB5G7xZ-oUw69ACDpS2ItxsYq_wVuU4orRs",
+            "dp": "IAi4Xdn6E_I5iL088-rlVtxV_at7UcRM49iOo_Po30X7va4bFRXmr-wIYEY9pvvJ87MjwUHT0p_wNAXK35qg1xcPi8usy9_5M6X6x-jmxjkvBBSOOoE6IZzFk9tx94sE0QXrbhea9EnLJmw-rW3NCKOGMtYRjL1CMqlhs2X40Ek",
+            "dq": "zB6XneQXzgmMgqgIRA_IDsODD4Sw-cKFtQwgDmL_BEXmvcaM5SLP_pg_z1GaZsDQsltM8dwQnveVq9YaDW19BonDwtkpa1SkMFe2GvOVIekb8A4uA2MY9j_k-PA253GkFUhwRNOaCaRq3TzJVYrQz5wGIp5vQRZDIs_8vhhh2TE",
+            "qi": "VQC4OZdyq0MMcg3kA65AJ7UndYUYcbuELcShArNZcFWom-PIU4gJyAuMo4b8BpTfB8mVLVcLwX5DkfcD5vVTZwmcWLxgvOQsEulnp81wMB5l78k6oyAR1gdj7tuL2Q03BKCDUOyewSEBC_f4QehdVZTmRJ8FfIo-5HwHpq_T1BY",
+            "alg": "PS256"
+        },
+        "controller": "https://www.ivan-herman.net#me",
+        "expires": "2050-02-24T00:00:00Z"
+    },
+    {
+        "public": {
+            "key_ops": [
+                "verify"
+            ],
+            "ext": true,
             "kty": "EC",
             "x": "LHGayjy__zWhz14u7vWyGbPWkXNdJN1AnhKiQTv3uK8",
             "y": "9T4ThlFhLi84d3LOaOkvrzLrr_EEczB0sIv3S3vzdd8",
@@ -21,7 +51,7 @@
             "crv": "P-256",
             "d": "4Gd_JxAFt1zA2kWMyMyRlJcEtyw2eIroUmbXawfT5Ls"
         },
-        "controller": "https://www.ivan-herman.net/#me",
+        "controller": "https://www.ivan-herman.net#me",
         "expires": "2055-02-24T00:00:00Z"
     },
     {
@@ -47,29 +77,5 @@
             "d": "zPcxJriu3QeQ90c2BFZiSPEWjbles4dB-tgMfGFCERU"
         },
         "controller": "https://example.org/key/#alan"
-    },
-    {
-        "public": {
-            "key_ops": [
-                "verify"
-            ],
-            "ext": true,
-            "kty": "EC",
-            "x": "Va-VUJp8w8m4BiaKVxxMaIWjZgf0zaPGvJx0oiaX-ys",
-            "y": "rV7eBS8u4d1eyA7IcNSVoD5C83IdesNMB-gVznJe3uY",
-            "crv": "P-256"
-        },
-        "private": {
-            "key_ops": [
-                "sign"
-            ],
-            "ext": true,
-            "kty": "EC",
-            "x": "Va-VUJp8w8m4BiaKVxxMaIWjZgf0zaPGvJx0oiaX-ys",
-            "y": "rV7eBS8u4d1eyA7IcNSVoD5C83IdesNMB-gVznJe3uY",
-            "crv": "P-256",
-            "d": "Httltx1gWOYBEGgqyCyL8UhhmHc7yZFfVxH_ITUzvxM"
-        },
-        "controller": "https://example.org/key/#jane"
     }
 ]
