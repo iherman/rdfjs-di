@@ -1,6 +1,6 @@
 {
   "name": "rdfjs-di",
-  "version": "1.0.0",
+  "version": "0.9.0",
   "description": "Data Integrity used to secure an RDF Dataset",
   "main": "index.js",
   "scripts": {
