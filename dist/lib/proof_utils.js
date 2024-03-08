@@ -76,7 +76,15 @@ async function generateAProofGraph(report, hashValue, keyData) {
             retval.add(quad(keyResource, exports.sec_revoked, literal(keyData.revoked, exports.xsd_datetime)));
         return retval;
     };
-    return createProofGraph(await (0, crypto_utils_1.sign)(report, hashValue, keyData.private));
+    const signature = await (0, crypto_utils_1.sign)(report, hashValue, keyData.private);
+    if (signature === null) {
+        // An error has occurred during signature; details are in the report.
+        // No proof graph is generated
+        return new n3.Store();
+    }
+    else {
+        return createProofGraph(signature);
+    }
 }
 exports.generateAProofGraph = generateAProofGraph;
 ;
@@ -230,6 +238,7 @@ async function verifyAProofGraph(report, hash, proof, proofId) {
  */
 async function verifyProofGraphs(report, hash, proofs) {
     const allErrors = [];
+    // deno-lint-ignore require-await
     const singleVerification = async (pr) => {
         const singleReport = { errors: [], warnings: [] };
         allErrors.push(singleReport);

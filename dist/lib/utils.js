@@ -106,6 +106,7 @@ exports.DatasetMap = DatasetMap;
  * @param obj
  * @returns
  */
+// deno-lint-ignore no-explicit-any
 function isDatasetCore(obj) {
     return obj.add !== undefined &&
         obj.delete !== undefined &&
@@ -119,6 +120,7 @@ exports.isDatasetCore = isDatasetCore;
  * @param obj
  * @returns
  */
+// deno-lint-ignore no-explicit-any
 function isKeyData(obj) {
     return obj.public !== undefined && obj.private !== undefined;
 }
@@ -180,6 +182,7 @@ function write_quads(dataset) {
     const writer = new n3.Writer({ prefixes: prefixes });
     for (const q of dataset)
         writer.addQuad(q);
-    writer.end((error, result) => console.log(result));
+    // deno-lint-ignore no-explicit-any
+    writer.end((_error, result) => console.log(result));
 }
 exports.write_quads = write_quads;
