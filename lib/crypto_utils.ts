@@ -75,13 +75,6 @@ const RsaAlgs: Record<Alg, WebCryptoAPIData> = {
  */
 function algorithmData(report: Errors, key: JsonWebKey): WebCryptoAPIData | null {
     switch (key.kty as Kty) {
-        case "EC" : {
-            return {
-                name:       "ECDSA",
-                namedCurve: key.crv as Crv,
-                hash:       DEFAULT_HASH
-            }
-        }
         case "RSA" : {
             try {
                 return RsaAlgs[key.alg as Alg];
@@ -89,6 +82,13 @@ function algorithmData(report: Errors, key: JsonWebKey): WebCryptoAPIData | null
                 report.errors.push(new types.Unclassified_Error(`Key's error in 'alg': ${e.message}`));
                 return null;
             }
+        }
+        case "EC": default: {
+            return {
+                name: "ECDSA",
+                namedCurve: key.crv as Crv,
+                hash: DEFAULT_HASH
+            };
         }
     }   
 }
@@ -264,13 +264,17 @@ export function cryptosuiteId(report: Errors, keyPair: KeyPair): Cryptosuites | 
     }
 
     const alg = algorithmData(report, keyPair.public);
-    switch (alg.name) {
-        case "ECDSA": return Cryptosuites.ecdsa;
-        case "RSA-PSS": return Cryptosuites.rsa_pss;
-        case "RSASSA-PKCS1-v1_5": return Cryptosuites.rsa_ssa;
-        default: {
-            report.errors.push(new types.Invalid_Verification_Method(`Unknown alg (${alg.name} in:\n ${JSON.stringify(keyPair,null,4)})`));
-            return null;
+    if (alg === null) {
+        return null;
+    } else {
+        switch (alg.name) {
+            case "ECDSA": return Cryptosuites.ecdsa;
+            case "RSA-PSS": return Cryptosuites.rsa_pss;
+            case "RSASSA-PKCS1-v1_5": return Cryptosuites.rsa_ssa;
+            default: {
+                report.errors.push(new types.Invalid_Verification_Method(`Unknown alg (${alg.name} in:\n ${JSON.stringify(keyPair,null,4)})`));
+                return null;
+            }
         }
     }
 }

@@ -16,8 +16,9 @@ import { isKeyData, isDatasetCore, convertToStore, DatasetMap, GraphWithID, calc
 import { generateAProofGraph, verifyProofGraphs, rdf_type, sec_di_proof, sec_proof, sec_prefix }   from './lib/proof_utils';
 
 /* This file is also the "top level", so a number of exports are put here to be more friendly to users */
-export { KeyData, VerificationResult, KeyMetadata, Cryptosuites } from './lib/types';
-export { generateKey, KeyDetails }                                from './lib/crypto_utils';
+export type { KeyData, VerificationResult, KeyMetadata, Cryptosuites } from './lib/types';
+export type { KeyDetails }                                from './lib/crypto_utils';
+export { generateKey }                                    from './lib/crypto_utils';
 
 // n3.DataFactory is a namespace with some functions...
 const { quad } = n3.DataFactory;

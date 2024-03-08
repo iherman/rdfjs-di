@@ -126,6 +126,7 @@ export class DatasetMap {
  * @param obj 
  * @returns 
  */
+// deno-lint-ignore no-explicit-any
 export function isDatasetCore(obj: any): obj is rdf.DatasetCore {
     return (obj as rdf.DatasetCore).add !== undefined &&
         (obj as rdf.DatasetCore).delete !== undefined &&
@@ -140,6 +141,7 @@ export function isDatasetCore(obj: any): obj is rdf.DatasetCore {
  * @param obj 
  * @returns 
  */
+// deno-lint-ignore no-explicit-any
 export function isKeyData(obj: any): obj is KeyMetadata {
     return (obj as KeyPair).public !== undefined && (obj as KeyPair).private !== undefined;
 }
@@ -202,5 +204,6 @@ const prefixes = {
 export function write_quads(dataset: rdf.DatasetCore) {
     const writer = new n3.Writer({ prefixes: prefixes });
     for (const q of dataset) writer.addQuad(q);
-    writer.end((error, result) => console.log(result));
+    // deno-lint-ignore no-explicit-any
+    writer.end((_error: any, result: any) => console.log(result));
 }

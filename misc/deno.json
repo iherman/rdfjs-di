@@ -20,9 +20,12 @@
     "@tufjs/canonical-json": "npm:@tufjs/canonical-json",
     "n3":                    "npm:n3",
     "uuid":                  "npm:uuid",
-    "./lib/errors":          "./lib/errors.ts",
     "./lib/utils":           "./lib/utils.ts",
     "../../index":           "../../index.ts",
+    "./types":               "./types.ts",
+    "./lib/types":           "./lib/types.ts",
+    "./lib/proof_utils":     "./lib/proof_utils.ts",
+    "./lib/crypto_utils":    "./lib/crypto_utils.ts",
     "./keys":                "./keys.ts",
     "./rdfn3":               "./rdfn3.ts"
   }

@@ -5,9 +5,12 @@ import * as process from 'node:process';
 
 import { KeyData, VerificationResult, 
     generateProofGraph, verifyProofGraph, 
-    embedProofGraph, verifyEmbeddedProofGraph } from '../../index';
+    embedProofGraph, verifyEmbeddedProofGraph,
+    generateKey
+} from '../../index';
 import { get_quads, DataFactory, write_quads }  from './rdfn3';
 import { get_keys, OSet }                       from './keys';
+import { Cryptosuites } from '../../lib/types';
 
 function displayVerificationResult(result: VerificationResult): void {
     console.log(`>>>> Verification result`);

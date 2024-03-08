@@ -55,7 +55,7 @@ export const xsd_datetime: rdf.NamedNode             = xsd_prefix('dateTime');
  * @param keyData 
  * @returns 
  */
-export async function generateAProofGraph(report: Errors, hashValue: string, keyData: KeyData): Promise < rdf.DatasetCore > {
+export async function generateAProofGraph(report: Errors, hashValue: string, keyData: KeyData): Promise <rdf.DatasetCore> {
     const cryptosuite = keyData?.cryptosuite || cryptosuiteId(report, keyData)
 
     // Create a proof graph. Just a boring set of quad generations...
@@ -104,7 +104,15 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
         if (keyData.revoked) retval.add(quad(keyResource, sec_revoked, literal(keyData.revoked, xsd_datetime)));
         return retval;
     };
-    return createProofGraph(await sign(report, hashValue, keyData.private));
+
+    const signature = await sign(report, hashValue, keyData.private);
+    if (signature === null) {
+        // An error has occurred during signature; details are in the report.
+        // No proof graph is generated
+        return new n3.Store();
+    } else {
+        return createProofGraph(signature);
+    }
 };
 
 /**
@@ -262,6 +270,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
  */
 export async function verifyProofGraphs(report: Errors, hash: string, proofs: GraphWithID[]): Promise<boolean> {
     const allErrors: Errors[] = [];
+    // deno-lint-ignore require-await
     const singleVerification = async (pr: GraphWithID): Promise<boolean> => {
         const singleReport: Errors = { errors: [], warnings: [] }
         allErrors.push(singleReport);
