@@ -11,9 +11,9 @@ import * as rdf          from '@rdfjs/types';
 import * as n3           from 'n3';
 import * as types        from './lib/types';
 
-import { Errors, KeyData, VerificationResult }                                                    from './lib/types';
-import { isKeyData, isDatasetCore, convertToStore, DatasetMap, MapContent, calculateDatasetHash } from './lib/utils';
-import { generateAProofGraph, verifyAProofGraph, rdf_type, sec_di_proof, sec_proof, sec_prefix }  from './lib/proof_utils';
+import { Errors, KeyData, VerificationResult }                                                     from './lib/types';
+import { isKeyData, isDatasetCore, convertToStore, DatasetMap, GraphWithID, calculateDatasetHash } from './lib/utils';
+import { generateAProofGraph, verifyProofGraphs, rdf_type, sec_di_proof, sec_proof, sec_prefix }   from './lib/proof_utils';
 
 /* This file is also the "top level", so a number of exports are put here to be more friendly to users */
 export { KeyData, VerificationResult, KeyMetadata, Cryptosuites } from './lib/types';
@@ -76,22 +76,17 @@ export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyD
  * @returns 
  */
 export async function verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore | rdf.DatasetCore[]): Promise<VerificationResult> {
-    // start fresh with the results:
-    const report: Errors = { errors: [], warnings: [] }
+    const report: Errors = { errors: [], warnings: [] }    
+    const hash: string = await calculateDatasetHash(dataset);
+    const proofGraphs: rdf.DatasetCore[] = isDatasetCore(proofGraph) ? [proofGraph] : proofGraph;
+    const proofs = proofGraphs.map((pr: rdf.DatasetCore): GraphWithID => {
+        return {
+            dataset: convertToStore(pr),
+            id: undefined,
+        };
+    });
+    const verified: boolean = await verifyProofGraphs(report, hash, proofs);
     
-    // this is the value that must be checked...
-    const hash = await calculateDatasetHash(dataset);
-
-    // just to make the handling uniform...
-    const proofs: rdf.DatasetCore[] = isDatasetCore(proofGraph) ? [proofGraph] : proofGraph;
-
-    // the "convertToStore" intermediate step is necessary; the proof graph checker needs a n3.Store
-    const promises: Promise<boolean>[] = proofs.map(convertToStore).map((pr_graph: n3.Store): Promise<boolean> => verifyAProofGraph(report, hash, pr_graph));
-    const results: boolean[] = await Promise.all(promises);
-
- 
-    const verified = (report.errors.length > 0) ? false : !results.includes(false);
-
     return {
         verified,
         verifiedDocument: verified ? dataset : null,
@@ -180,9 +175,6 @@ export async function embedProofGraph(dataset: rdf.DatasetCore, keyData: KeyData
  * @returns 
 */
 export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?: rdf.Quad_Subject): Promise<VerificationResult> {
-    // start fresh with the results:
-    const report: Errors = { errors: [], warnings: [] }
-
     const dataStore   = new n3.Store();
     const proofGraphs = new DatasetMap();
 
@@ -225,18 +217,15 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
         }
     }
 
-    const hash = await calculateDatasetHash(dataStore);
-
-    const proofs: MapContent[] = proofGraphs.data(); 
-    const promises: Promise<boolean>[] = proofs.map((prGraph: MapContent): Promise<boolean> => verifyAProofGraph(report, hash, prGraph.dataset, prGraph.id));
-    const results: boolean[] = await Promise.all(promises);
-
-    const verified = (report.errors.length > 0) ? false : !results.includes(false);
+    const report: Errors = { errors: [], warnings: [] };
+    const hash: string = await calculateDatasetHash(dataStore);
+    const proofs: GraphWithID[] = proofGraphs.data(); 
+    const verified: boolean = await verifyProofGraphs(report, hash, proofs);
     return {
         verified,
         verifiedDocument: verified ? dataStore : null,
-        errors          : report.errors,
-        warnings        : report.warnings
+        errors: report.errors,
+        warnings: report.warnings
     }
 }
 

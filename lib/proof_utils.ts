@@ -16,7 +16,7 @@ import { v4 as uuid } from 'uuid';
 
 import * as types                      from './types';
 import { Errors, KeyData }             from './types';
-import { createPrefix }                from './utils';
+import { createPrefix, GraphWithID }   from './utils';
 import { sign, verify, cryptosuiteId } from './crypto_utils';
 
 // n3.DataFactory is a namespace with some functions...
@@ -108,7 +108,7 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
 };
 
 /**
- * Check one proof graph, ie, whether the included signature corresponds to the hash value.
+ * Check a single proof graph, ie, whether the included signature corresponds to the hash value.
  * 
  * The following checks are also made:
  * 
@@ -127,7 +127,7 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
  * @param proofId - Id of the proof graph, if known; used in the error reports only
  * @returns 
  */
-export async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, proofId ?: rdf.Quad_Graph): Promise < boolean> {
+async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, proofId: rdf.Quad_Graph | undefined): Promise < boolean> {
     const localErrors   : types.ProblemDetail[] = [];
     const localWarnings : types.ProblemDetail[] = [];
 
@@ -219,7 +219,7 @@ export async function verifyAProofGraph(report: Errors, hash: string, proof: n3.
     const proofValue: string | null = getProofValue(proof);
 
     // The final set of error/warning should be modified with the proof graph's ID, if applicable
-    if (proofId) {
+    if (proofId !== undefined) {
         localErrors.forEach((error) => {
             error.detail = `${error.detail} (graph ID: <${proofId.value}>)`;
         });
@@ -238,4 +238,45 @@ export async function verifyAProofGraph(report: Errors, hash: string, proof: n3.
     } else {
         return false;
     }
+}
+
+/**
+ *  Check a series of proof graphs, ie, check whether the included signature of a proof graph corresponds to the hash value.
+ * 
+ * The following checks are also made for each proof graph:
+ * 
+ * 1. There should be exactly one [proof value](https://www.w3.org/TR/vc-data-integrity/#dfn-proofvalue)
+ * 2. There should be exactly one [verification method](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod), which should be a separate resource containing the key (in JWK)
+ * 3. The key's (optional) [expiration](https://www.w3.org/TR/vc-data-integrity/#defn-proof-expires) and 
+ * [revocation](https://www.w3.org/TR/vc-data-integrity/#dfn-revoked) dates are checked and compared to the current time which should be "before"
+ * 4. The proof's [creation date](https://www.w3.org/TR/vc-data-integrity/#dfn-created) must be before the current time
+ * 5. The proof [purpose(s)](https://www.w3.org/TR/vc-data-integrity/#dfn-proofpurpose) must be set, and the values are either [authentication](https://www.w3.org/TR/vc-data-integrity/#dfn-authentication) or [verification](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod)
+ * 
+ * Errors are stored in the `report` structure.
+ * If any error occurs in any proof graph the result is `false`; otherwise, result is the conjunction of each individual proof graph verifications. 
+ * 
+ * @param report - placeholder for error reports
+ * @param hash 
+ * @param proofs 
+ * @returns 
+ */
+export async function verifyProofGraphs(report: Errors, hash: string, proofs: GraphWithID[]): Promise<boolean> {
+    const allErrors: Errors[] = [];
+    const singleVerification = async (pr: GraphWithID): Promise<boolean> => {
+        const singleReport: Errors = { errors: [], warnings: [] }
+        allErrors.push(singleReport);
+        return verifyAProofGraph(singleReport, hash, pr.dataset, pr.id);
+    }
+
+    const promises: Promise<boolean>[] = proofs.map(singleVerification);
+    const result: boolean[] = await Promise.all(promises)
+
+    // consolidate error messages. By using allErrors the error messages
+    // follow the same order as the incoming proof graph references,
+    // and are not possibly shuffled by the async calls
+    for (const singleReport of allErrors) {
+        report.errors = [...report.errors, ...singleReport.errors];
+        report.warnings = [...report.warnings, ...singleReport.warnings]
+    }
+    return !result.includes(false)
 }

@@ -61,8 +61,8 @@ export function createPrefix(uri: string): (l: string) => rdf.NamedNode {
 /**
  * Structure with a separate store and its ID as a graph
  */
-export interface MapContent {
-    id      : rdf.Quad_Graph,
+export interface GraphWithID {
+    id:       rdf.Quad_Graph | undefined,
     dataset : n3.Store;
 }
 
@@ -73,7 +73,7 @@ export interface MapContent {
  * the original term; that may become unnecessary on long term.)
  */
 export class DatasetMap {
-    private index: Map<string, MapContent>;
+    private index: Map<string, GraphWithID>;
 
     constructor() {
         this.index = new Map();
@@ -110,7 +110,7 @@ export class DatasetMap {
         return Array.from(this.index.values()).map((entry) => entry.dataset);
     }
 
-    data(): MapContent[] {
+    data(): GraphWithID[] {
         return Array.from(this.index.values());
     }
 }
