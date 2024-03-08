@@ -60,16 +60,16 @@ exports.generateProofGraph = generateProofGraph;
  * @returns
  */
 async function verifyProofGraph(dataset, proofGraph) {
-    // start fresh with the results:
     const report = { errors: [], warnings: [] };
-    // this is the value that must be checked...
     const hash = await (0, utils_1.calculateDatasetHash)(dataset);
-    // just to make the handling uniform...
-    const proofs = (0, utils_1.isDatasetCore)(proofGraph) ? [proofGraph] : proofGraph;
-    // the "convertToStore" intermediate step is necessary; the proof graph checker needs a n3.Store
-    const promises = proofs.map(utils_1.convertToStore).map((pr_graph) => (0, proof_utils_1.verifyAProofGraph)(report, hash, pr_graph));
-    const results = await Promise.all(promises);
-    const verified = (report.errors.length > 0) ? false : !results.includes(false);
+    const proofGraphs = (0, utils_1.isDatasetCore)(proofGraph) ? [proofGraph] : proofGraph;
+    const proofs = proofGraphs.map((pr) => {
+        return {
+            dataset: (0, utils_1.convertToStore)(pr),
+            id: undefined,
+        };
+    });
+    const verified = await (0, proof_utils_1.verifyProofGraphs)(report, hash, proofs);
     return {
         verified,
         verifiedDocument: verified ? dataset : null,
@@ -154,8 +154,6 @@ exports.embedProofGraph = embedProofGraph;
  * @returns
 */
 async function verifyEmbeddedProofGraph(dataset, anchor) {
-    // start fresh with the results:
-    const report = { errors: [], warnings: [] };
     const dataStore = new n3.Store();
     const proofGraphs = new utils_1.DatasetMap();
     // First, identify the possible dataset graph IDs
@@ -199,11 +197,10 @@ async function verifyEmbeddedProofGraph(dataset, anchor) {
             dataStore.add(q);
         }
     }
+    const report = { errors: [], warnings: [] };
     const hash = await (0, utils_1.calculateDatasetHash)(dataStore);
     const proofs = proofGraphs.data();
-    const promises = proofs.map((prGraph) => (0, proof_utils_1.verifyAProofGraph)(report, hash, prGraph.dataset, prGraph.id));
-    const results = await Promise.all(promises);
-    const verified = (report.errors.length > 0) ? false : !results.includes(false);
+    const verified = await (0, proof_utils_1.verifyProofGraphs)(report, hash, proofs);
     return {
         verified,
         verifiedDocument: verified ? dataStore : null,

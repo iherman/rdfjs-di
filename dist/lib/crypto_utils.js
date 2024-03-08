@@ -174,9 +174,10 @@ exports.sign = sign;
  *
  * Possible errors are added to the report, no exceptions should be thrown.
  *
- * @param report
+ * @param report - placeholder for error reports
  * @param message
- * @param secretKey
+ * @param signature
+ * @param publicKey
  * @returns
  */
 async function verify(report, message, signature, publicKey) {
@@ -207,7 +208,7 @@ exports.verify = verify;
 /**
  * Mapping from the JWK data to the corresponding DI cryptosuite identifier.
  *
- * @param report
+ * @param report - placeholder for error reports
  * @param keyPair
  * @returns
  */

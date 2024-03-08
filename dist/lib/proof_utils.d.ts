@@ -9,8 +9,8 @@
  * @packageDocumentation
  */
 import * as rdf from '@rdfjs/types';
-import * as n3 from 'n3';
 import { Errors, KeyData } from './types';
+import { GraphWithID } from './utils';
 /***************************************************************************************
  * Namespaces and specific terms that are used several times
  **************************************************************************************/
@@ -34,15 +34,16 @@ export declare const xsd_datetime: rdf.NamedNode;
  * Generate a (separate) proof graph, per the DI spec. The signature is stored in
  * [multibase format](https://www.w3.org/TR/vc-data-integrity/#multibase-0), using base64url encoding.
  *
+ * @param report - placeholder for error reports
  * @param hashValue - this is the value of the Dataset's canonical hash
  * @param keyData
  * @returns
  */
 export declare function generateAProofGraph(report: Errors, hashValue: string, keyData: KeyData): Promise<rdf.DatasetCore>;
 /**
- * Check one proof graph, ie, whether the included signature corresponds to the hash value.
+ *  Check a series of proof graphs, ie, check whether the included signature of a proof graph corresponds to the hash value.
  *
- * The following checks are also made:
+ * The following checks are also made for each proof graph:
  *
  * 1. There should be exactly one [proof value](https://www.w3.org/TR/vc-data-integrity/#dfn-proofvalue)
  * 2. There should be exactly one [verification method](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod), which should be a separate resource containing the key (in JWK)
@@ -51,11 +52,12 @@ export declare function generateAProofGraph(report: Errors, hashValue: string, k
  * 4. The proof's [creation date](https://www.w3.org/TR/vc-data-integrity/#dfn-created) must be before the current time
  * 5. The proof [purpose(s)](https://www.w3.org/TR/vc-data-integrity/#dfn-proofpurpose) must be set, and the values are either [authentication](https://www.w3.org/TR/vc-data-integrity/#dfn-authentication) or [verification](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod)
  *
- * Errors are stored in the `report` structure. If any error occurs, the result is false.
+ * Errors are stored in the `report` structure.
+ * If any error occurs in any proof graph the result is `false`; otherwise, result is the conjunction of each individual proof graph verifications.
  *
- * @param report
+ * @param report - placeholder for error reports
  * @param hash
- * @param proof
+ * @param proofs
  * @returns
  */
-export declare function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, proofId?: rdf.Quad_Graph): Promise<boolean>;
+export declare function verifyProofGraphs(report: Errors, hash: string, proofs: GraphWithID[]): Promise<boolean>;

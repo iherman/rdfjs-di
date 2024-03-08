@@ -47,16 +47,17 @@ export declare function sign(report: Errors, message: string, secretKey: JsonWeb
  *
  * Possible errors are added to the report, no exceptions should be thrown.
  *
- * @param report
+ * @param report - placeholder for error reports
  * @param message
- * @param secretKey
+ * @param signature
+ * @param publicKey
  * @returns
  */
 export declare function verify(report: Errors, message: string, signature: string, publicKey: JsonWebKey): Promise<boolean>;
 /**
  * Mapping from the JWK data to the corresponding DI cryptosuite identifier.
  *
- * @param report
+ * @param report - placeholder for error reports
  * @param keyPair
  * @returns
  */

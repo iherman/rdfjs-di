@@ -10,7 +10,7 @@
  * @packageDocumentation
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyAProofGraph = exports.generateAProofGraph = exports.xsd_datetime = exports.sec_created = exports.sec_revoked = exports.sec_expires = exports.sec_verificationMethod = exports.sec_assertionMethod = exports.sec_authenticationMethod = exports.sec_proofPurpose = exports.sec_publicKeyJwk = exports.sec_proofValue = exports.sec_di_proof = exports.sec_proof = exports.rdf_type = exports.xsd_prefix = exports.rdf_prefix = exports.sec_prefix = void 0;
+exports.verifyProofGraphs = exports.generateAProofGraph = exports.xsd_datetime = exports.sec_created = exports.sec_revoked = exports.sec_expires = exports.sec_verificationMethod = exports.sec_assertionMethod = exports.sec_authenticationMethod = exports.sec_proofPurpose = exports.sec_publicKeyJwk = exports.sec_proofValue = exports.sec_di_proof = exports.sec_proof = exports.rdf_type = exports.xsd_prefix = exports.rdf_prefix = exports.sec_prefix = void 0;
 const n3 = require("n3");
 const uuid_1 = require("uuid");
 const types = require("./types");
@@ -42,6 +42,7 @@ exports.xsd_datetime = (0, exports.xsd_prefix)('dateTime');
  * Generate a (separate) proof graph, per the DI spec. The signature is stored in
  * [multibase format](https://www.w3.org/TR/vc-data-integrity/#multibase-0), using base64url encoding.
  *
+ * @param report - placeholder for error reports
  * @param hashValue - this is the value of the Dataset's canonical hash
  * @param keyData
  * @returns
@@ -80,7 +81,7 @@ async function generateAProofGraph(report, hashValue, keyData) {
 exports.generateAProofGraph = generateAProofGraph;
 ;
 /**
- * Check one proof graph, ie, whether the included signature corresponds to the hash value.
+ * Check a single proof graph, ie, whether the included signature corresponds to the hash value.
  *
  * The following checks are also made:
  *
@@ -93,9 +94,10 @@ exports.generateAProofGraph = generateAProofGraph;
  *
  * Errors are stored in the `report` structure. If any error occurs, the result is false.
  *
- * @param report
+ * @param report - placeholder for error reports
  * @param hash
- * @param proof
+ * @param proof - the proof graph
+ * @param proofId - Id of the proof graph, if known; used in the error reports only
  * @returns
  */
 async function verifyAProofGraph(report, hash, proof, proofId) {
@@ -186,7 +188,7 @@ async function verifyAProofGraph(report, hash, proof, proofId) {
     const publicKey = getPublicKey(proof);
     const proofValue = getProofValue(proof);
     // The final set of error/warning should be modified with the proof graph's ID, if applicable
-    if (proofId) {
+    if (proofId !== undefined) {
         localErrors.forEach((error) => {
             error.detail = `${error.detail} (graph ID: <${proofId.value}>)`;
         });
@@ -206,4 +208,42 @@ async function verifyAProofGraph(report, hash, proof, proofId) {
         return false;
     }
 }
-exports.verifyAProofGraph = verifyAProofGraph;
+/**
+ *  Check a series of proof graphs, ie, check whether the included signature of a proof graph corresponds to the hash value.
+ *
+ * The following checks are also made for each proof graph:
+ *
+ * 1. There should be exactly one [proof value](https://www.w3.org/TR/vc-data-integrity/#dfn-proofvalue)
+ * 2. There should be exactly one [verification method](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod), which should be a separate resource containing the key (in JWK)
+ * 3. The key's (optional) [expiration](https://www.w3.org/TR/vc-data-integrity/#defn-proof-expires) and
+ * [revocation](https://www.w3.org/TR/vc-data-integrity/#dfn-revoked) dates are checked and compared to the current time which should be "before"
+ * 4. The proof's [creation date](https://www.w3.org/TR/vc-data-integrity/#dfn-created) must be before the current time
+ * 5. The proof [purpose(s)](https://www.w3.org/TR/vc-data-integrity/#dfn-proofpurpose) must be set, and the values are either [authentication](https://www.w3.org/TR/vc-data-integrity/#dfn-authentication) or [verification](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod)
+ *
+ * Errors are stored in the `report` structure.
+ * If any error occurs in any proof graph the result is `false`; otherwise, result is the conjunction of each individual proof graph verifications.
+ *
+ * @param report - placeholder for error reports
+ * @param hash
+ * @param proofs
+ * @returns
+ */
+async function verifyProofGraphs(report, hash, proofs) {
+    const allErrors = [];
+    const singleVerification = async (pr) => {
+        const singleReport = { errors: [], warnings: [] };
+        allErrors.push(singleReport);
+        return verifyAProofGraph(singleReport, hash, pr.dataset, pr.id);
+    };
+    const promises = proofs.map(singleVerification);
+    const result = await Promise.all(promises);
+    // consolidate error messages. By using allErrors the error messages
+    // follow the same order as the incoming proof graph references,
+    // and are not possibly shuffled by the async calls
+    for (const singleReport of allErrors) {
+        report.errors = [...report.errors, ...singleReport.errors];
+        report.warnings = [...report.warnings, ...singleReport.warnings];
+    }
+    return !result.includes(false);
+}
+exports.verifyProofGraphs = verifyProofGraphs;

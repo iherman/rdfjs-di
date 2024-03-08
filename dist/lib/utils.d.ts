@@ -32,8 +32,8 @@ export declare function createPrefix(uri: string): (l: string) => rdf.NamedNode;
 /**
  * Structure with a separate store and its ID as a graph
  */
-export interface MapContent {
-    id: rdf.Quad_Graph;
+export interface GraphWithID {
+    id: rdf.Quad_Graph | undefined;
     dataset: n3.Store;
 }
 /**
@@ -55,7 +55,7 @@ export declare class DatasetMap {
     item(graph: rdf.Quad_Graph): n3.Store;
     has(graph: rdf.Term): boolean;
     datasets(): n3.Store[];
-    data(): MapContent[];
+    data(): GraphWithID[];
 }
 /*****************************************************************************************
  * Misc Utility Functions
