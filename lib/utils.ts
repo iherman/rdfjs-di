@@ -185,25 +185,3 @@ function copyToStore(dataset: rdf.DatasetCore): n3.Store {
 export function convertToStore(dataset: rdf.DatasetCore): n3.Store {
     return (dataset instanceof n3.Store) ? dataset : copyToStore(dataset);
 }
-
-/*****************************************************************************************
- *  This is only used for debugging!!!!
-*****************************************************************************************/
-
-const prefixes = {
-    sec: "https://w3id.org/security#",
-    rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns",
-    xsd: "http://www.w3.org/2001/XMLSchema#",
-    rdfs: "http://www.w3.org/2000/01/rdf-schema#",
-    dc: "http://purl.org/dc/terms/",
-    foaf: "http://xmlns.com/foaf/0.1/",
-    doap: "http://usefulinc.com/ns/doap#",
-    earl: "http://www.w3.org/ns/earl#",
-};
-
-export function write_quads(dataset: rdf.DatasetCore) {
-    const writer = new n3.Writer({ prefixes: prefixes });
-    for (const q of dataset) writer.addQuad(q);
-    // deno-lint-ignore no-explicit-any
-    writer.end((_error: any, result: any) => console.log(result));
-}

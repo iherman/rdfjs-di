@@ -61,14 +61,11 @@ const prefixes = {
 }
 
 export function write_quads(dataset: rdf.DatasetCore) {
-    const writer = new n3.Writer( {prefixes: prefixes});
+    const writer = new n3.Writer({prefixes});
     for (const q of dataset) writer.addQuad(q);
     // deno-lint-ignore no-explicit-any
     writer.end((_error: any, result: any) => console.log(result));
 }
-
-
-
 
 
 export const DataFactory: rdf.DataFactory = n3.DataFactory;
