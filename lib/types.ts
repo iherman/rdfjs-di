@@ -7,9 +7,9 @@
 import * as rdf   from '@rdfjs/types';
 
 export enum Cryptosuites {
-    ecdsa   = "ecdsa-2022",
-    rsa_pss = "rdfjs-di-rsa-pss",
-    rsa_ssa = "rdfjs-di-rss-ssa"
+    ecdsa   = "ecdsa-rdfc-2019",
+    rsa_pss = "rsa-pss-rdfc-ih",
+    rsa_ssa = "rsa-ssa-rdfc-ih"
 }
 
 export interface VerificationResult extends Errors {
