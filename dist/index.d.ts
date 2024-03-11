@@ -6,8 +6,9 @@
  */
 import * as rdf from '@rdfjs/types';
 import { KeyData, VerificationResult } from './lib/types';
-export type { KeyData, VerificationResult, KeyMetadata, Cryptosuites } from './lib/types';
+export type { KeyData, VerificationResult, KeyMetadata } from './lib/types';
 export type { KeyDetails } from './lib/crypto_utils';
+export { Cryptosuites } from './lib/types';
 export { generateKey } from './lib/crypto_utils';
 /**
  * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in

@@ -8,9 +8,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Unclassified_Error = exports.Invalid_Verification_Method = exports.Mismatched_Proof_Purpose = exports.Malformed_Proof_Error = exports.Proof_Generation_Error = exports.ProblemDetail = exports.Cryptosuites = void 0;
 var Cryptosuites;
 (function (Cryptosuites) {
-    Cryptosuites["ecdsa"] = "ecdsa-2022";
-    Cryptosuites["rsa_pss"] = "rdfjs-di-rsa-pss";
-    Cryptosuites["rsa_ssa"] = "rdfjs-di-rss-ssa";
+    Cryptosuites["ecdsa"] = "ecdsa-rdfc-2019";
+    Cryptosuites["rsa_pss"] = "rsa-pss-rdfc-ih";
+    Cryptosuites["rsa_ssa"] = "rsa-ssa-rdfc-ih";
 })(Cryptosuites || (exports.Cryptosuites = Cryptosuites = {}));
 /*****************************************************************************************
  * Errors

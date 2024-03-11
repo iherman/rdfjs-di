@@ -89,4 +89,3 @@ export declare function calculateDatasetHash(dataset: rdf.DatasetCore): Promise<
  * @returns
  */
 export declare function convertToStore(dataset: rdf.DatasetCore): n3.Store;
-export declare function write_quads(dataset: rdf.DatasetCore): void;

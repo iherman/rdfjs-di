@@ -11,14 +11,15 @@ import * as rdf          from '@rdfjs/types';
 import * as n3           from 'n3';
 import * as types        from './lib/types';
 
-import { Errors, KeyData, VerificationResult }                                                     from './lib/types';
+import { Errors, KeyData, VerificationResult, Cryptosuites } from './lib/types';
 import { isKeyData, isDatasetCore, convertToStore, DatasetMap, GraphWithID, calculateDatasetHash } from './lib/utils';
 import { generateAProofGraph, verifyProofGraphs, rdf_type, sec_di_proof, sec_proof, sec_prefix }   from './lib/proof_utils';
 
 /* This file is also the "top level", so a number of exports are put here to be more friendly to users */
-export type { KeyData, VerificationResult, KeyMetadata, Cryptosuites } from './lib/types';
-export type { KeyDetails }                                from './lib/crypto_utils';
-export { generateKey }                                    from './lib/crypto_utils';
+export type { KeyData, VerificationResult, KeyMetadata } from './lib/types';
+export type { KeyDetails }                               from './lib/crypto_utils';
+export { Cryptosuites}                                   from './lib/types';
+export { generateKey }                                   from './lib/crypto_utils';
 
 // n3.DataFactory is a namespace with some functions...
 const { quad } = n3.DataFactory;

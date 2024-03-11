@@ -6,11 +6,13 @@
  * @packageDocumentation
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyEmbeddedProofGraph = exports.embedProofGraph = exports.verifyProofGraph = exports.generateProofGraph = exports.generateKey = void 0;
+exports.verifyEmbeddedProofGraph = exports.embedProofGraph = exports.verifyProofGraph = exports.generateProofGraph = exports.generateKey = exports.Cryptosuites = void 0;
 const n3 = require("n3");
 const types = require("./lib/types");
 const utils_1 = require("./lib/utils");
 const proof_utils_1 = require("./lib/proof_utils");
+var types_1 = require("./lib/types");
+Object.defineProperty(exports, "Cryptosuites", { enumerable: true, get: function () { return types_1.Cryptosuites; } });
 var crypto_utils_1 = require("./lib/crypto_utils");
 Object.defineProperty(exports, "generateKey", { enumerable: true, get: function () { return crypto_utils_1.generateKey; } });
 // n3.DataFactory is a namespace with some functions...
