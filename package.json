@@ -23,9 +23,9 @@
     "security"
   ],
   "dependencies": {
+    "rdfjs-c14n": "^3.1.0",
     "@rdfjs/types": "^1.1.0",
     "n3": "^1.17.2",
-    "rdfjs-c14n": "file:../../RCH/rdfjs-c14n",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
