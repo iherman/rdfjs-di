@@ -14,10 +14,10 @@ import * as rdf       from '@rdfjs/types';
 import * as n3        from 'n3';
 import { v4 as uuid } from 'uuid';
 
-import * as types                      from './types';
-import { Errors, KeyData }             from './types';
-import { createPrefix, GraphWithID }   from './utils';
-import { sign, verify, cryptosuiteId } from './crypto_utils';
+import * as types                                          from './types';
+import { Errors, KeyData }                                 from './types';
+import { createPrefix, GraphWithID /*, calculateDatasetHash */ } from './utils';
+import { sign, verify, cryptosuiteId }                     from './crypto_utils';
 
 // n3.DataFactory is a namespace with some functions...
 const { namedNode, literal, quad } = n3.DataFactory;
@@ -45,6 +45,12 @@ export const sec_revoked: rdf.NamedNode              = sec_prefix('revoked');
 export const sec_created: rdf.NamedNode              = sec_prefix('created');
 export const xsd_datetime: rdf.NamedNode             = xsd_prefix('dateTime');
 
+
+// async function getCombinedHash(origHashValue: string, proofOptionsGraph: rdf.DatasetCore): Promise<string> {
+//     // Generate a hash for the proofOptionsGraph
+//     const proofHashValue = await calculateDatasetHash(proofOptionsGraph);
+//     return origHashValue + proofHashValue;
+// }
 
 /**
  * Generate a (separate) proof graph, per the DI spec. The signature is stored in 
@@ -104,6 +110,28 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
         if (keyData.revoked) retval.add(quad(keyResource, sec_revoked, literal(keyData.revoked, xsd_datetime)));
         return retval;
     };
+
+    /*
+        - generate "proof options graph" that does not have the proof value in it (everything else is there)
+
+        const {proofGraph, proofGraphId } = createProofOptionGraph();
+        const combinedHash = await getCombinedHash(hashValue, proofGraph);
+        const signature = await sign(report,combinedHash, keyData.private)
+        if (signature === null) {
+
+        } else {
+            proofGraph.add(quad(proofGraphId, sec_proofValue, literal(signature)));
+            return proofGraph
+        }
+
+
+        - calculate dataset hash for the proof option graph
+        - concatenate the value of hashValue and the new hash
+        - use sign to sigh the concatenated thing
+        - add the signature to the proof options graph to make it a complete proof graph.
+
+    */
+
 
     const signature = await sign(report, hashValue, keyData.private);
     if (signature === null) {
@@ -238,8 +266,15 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
     report.errors = [...report.errors, ...localErrors];
     report.warnings = [...report.warnings, ...localWarnings];
 
+
     // Here we go with checking...
     if (publicKey !== null && proofValue !== null) {
+        /*
+            - create a new dataset from the proof graph without the proof value
+            - calculate the dataset hash from that graph
+            - concatenate the hash value with the new value
+            - the results should be used for verification
+        */
         const check_results = await verify(report, hash, proofValue, publicKey)
         // the return value should nevertheless be false if there have been errors
         return check_results ? localErrors.length === 0 : true;
