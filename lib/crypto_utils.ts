@@ -269,6 +269,7 @@ export function cryptosuiteId(report: Errors, keyPair: KeyPair): Cryptosuites | 
     } else {
         switch (alg.name) {
             case "ECDSA": return Cryptosuites.ecdsa;
+            case "Ed25519": return Cryptosuites.eddsa;
             case "RSA-PSS": return Cryptosuites.rsa_pss;
             case "RSASSA-PKCS1-v1_5": return Cryptosuites.rsa_ssa;
             default: {
@@ -295,6 +296,9 @@ export async function generateKey(suite: Cryptosuites, metadata?: KeyMetadata, k
             case Cryptosuites.ecdsa : return {
                 name: "ECDSA",
                 namedCurve: keyData?.namedCurve || DEFAULT_CURVE,
+            }
+            case Cryptosuites.eddsa: return {
+                name: "Ed25519"
             }
             case Cryptosuites.rsa_pss : return {
                 name: "RSA-PSS",

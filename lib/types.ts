@@ -8,6 +8,7 @@ import * as rdf   from '@rdfjs/types';
 
 export enum Cryptosuites {
     ecdsa   = "ecdsa-rdfc-2019",
+    eddsa   = "eddsa-rdfc-2019",
     rsa_pss = "rsa-pss-rdfc-ih",
     rsa_ssa = "rsa-ssa-rdfc-ih"
 }

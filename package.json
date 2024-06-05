@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "./node_modules/.bin/ts-node testing/run/main.ts",
+    "crkey": "./node_modules/.bin/ts-node testing/run/createKeys.ts",
     "docs": "./node_modules/.bin/typedoc index.ts lib/*",
     "dist": "tsc -d"
   },
@@ -23,13 +24,17 @@
     "security"
   ],
   "dependencies": {
-    "rdfjs-c14n": "^3.1.0",
     "@rdfjs/types": "^1.1.0",
+    "base58-universal": "^2.0.0",
+    "base64url": "^3.0.1",
+    "elliptic": "^6.5.5",
     "n3": "^1.17.2",
+    "rdfjs-c14n": "^3.1.0",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@tufjs/canonical-json": "^2.0.0",
+    "@types/elliptic": "^6.4.18",
     "@types/n3": "^1.16.4",
     "@types/node": "^20.11.19",
     "@types/uuid": "^9.0.8",
