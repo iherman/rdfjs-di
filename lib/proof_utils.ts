@@ -196,7 +196,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
         return proof_values[0].object.value;
     };
 
-    const getPublicKey = (store: n3.Store): JsonWebKey | null => {
+    const getPublicKey = async (store: n3.Store): Promise<JsonWebKey | null> => {
         // first see if the verificationMethod has been set properly
         const verificationMethod: rdf.Quad[] = store.getQuads(null, sec_verificationMethod, null, null);
         if (verificationMethod.length === 0) {
@@ -207,14 +207,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
         }
 
         const publicKey = verificationMethod[0].object;
-        const keys: rdf.Quad[] = store.getQuads(publicKey, sec_publicKeyJwk, null, null);
-        if (keys.length === 0) {
-            localErrors.push(new types.Invalid_Verification_Method(`No key values`));
-            return null;
-        } else if (keys.length > 1) {
-            localErrors.push(new types.Invalid_Verification_Method("More than one keys provided"));
-        }
-
+   
         // Check the creation/expiration/revocation dates, if any...
         const now = new Date();
         const creationDates: rdf.Quad[] = store.getQuads(null, sec_created, null, null);
@@ -239,13 +232,46 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
             }
         }
 
-        try {
-            return JSON.parse(keys[0].object.value) as JsonWebKey;
-        } catch (e) {
-            // This happens if there is a JSON parse error with the key...
-            localWarnings.push(new types.Malformed_Proof_Error(`Parsing error for JWK: ${e.message}`));
+        // All conditions are fulfilled, the key can now be retrieved and returned 
+        // The key itself can be in JWK or in Multikey format
+        const keys_jwk: rdf.Quad[]      = store.getQuads(publicKey, sec_publicKeyJwk, null, null);
+        const keys_multikey: rdf.Quad[] = store.getQuads(publicKey, sec_publicKeyMultibase, null, null);
+
+        // Both arrays cannot be valid!
+        if (keys_jwk.length > 0 && keys_multikey.length > 0) {
+            localWarnings.push(new types.Malformed_Proof_Error(`JWK or Multikey formats can be used, but not both.`));
+            return null;
+        } else if (keys_jwk.length === 0) {
+            // Trying Multikey, JWK is not used...
+            if (keys_multikey.length === 0) {
+                localErrors.push(new types.Invalid_Verification_Method(`No key values`));
+                return null;
+            } else if (keys_multikey.length === 1) {
+                try {
+                    const key: CryptoKey = await multikeyToKey(keys_multikey[0].object.value);
+                    return crypto.subtle.exportKey('jwk', key);
+                } catch(e) {
+                    localWarnings.push(new types.Malformed_Proof_Error(`Parsing error for Multikey: ${e.message}`));
+                    return null;
+                }
+            } else {
+                localErrors.push(new types.Invalid_Verification_Method("More than one Multikey encoded keys"));
+                return null;
+            }
+        } else if (keys_jwk.length === 1) {
+            // We have a JWK key, we can return it if it parses o.k.
+            try {
+                return JSON.parse(keys_jwk[0].object.value) as JsonWebKey;
+            } catch (e) {
+                // This happens if there is a JSON parse error with the key...
+                localWarnings.push(new types.Malformed_Proof_Error(`Parsing error for JWK: ${e.message}`));
+                return null;
+            }
+        } else {
+            localErrors.push(new types.Invalid_Verification_Method("More than one JWK encoded keys"));
             return null;
         }
+
     };
 
     // Check the "proofPurpose" property value
@@ -268,7 +294,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
 
     // Retrieve necessary values with checks
     checkProofPurposes(proof);
-    const publicKey: JsonWebKey | null = getPublicKey(proof);
+    const publicKey: JsonWebKey | null = await getPublicKey(proof);
     const proofValue: string | null = getProofValue(proof);
 
     // The final set of error/warning should be modified with the proof graph's ID, if applicable
@@ -280,9 +306,8 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
             warning.detail = `${warning.detail} (graph ID: <${proofId.value}>)`;
         });
     }
-    report.errors = [...report.errors, ...localErrors];
+    report.errors   = [...report.errors, ...localErrors];
     report.warnings = [...report.warnings, ...localWarnings];
-
 
     // Here we go with checking...
     if (publicKey !== null && proofValue !== null) {
