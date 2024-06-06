@@ -4,7 +4,7 @@
  * @packageDocumentation
  */
 
-import * as rdf   from '@rdfjs/types';
+import * as rdf from '@rdfjs/types';
 
 export enum Cryptosuites {
     ecdsa   = "ecdsa-rdfc-2019",

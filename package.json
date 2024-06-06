@@ -25,6 +25,7 @@
   ],
   "dependencies": {
     "@rdfjs/types": "^1.1.0",
+    "@truestamp/canonify": "^2.1.0",
     "base58-universal": "^2.0.0",
     "base64url": "^3.0.1",
     "elliptic": "^6.5.5",

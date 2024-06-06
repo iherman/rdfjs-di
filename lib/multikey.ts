@@ -1,3 +1,14 @@
+/**
+ * Handling the Multikey encoding of ECDSA and EDDSA keys.
+ * 
+ * Put into a separate file for an easier maintenance; not meant
+ * to be part of the external API.
+ * They are not exported (via `index.ts`) to
+ * package users.
+ * 
+ * @packageDocumentation
+ */
+
 import * as base58       from './base58/index';
 import * as types        from "./types";
 import * as crypto_types from "./crypto_utils";

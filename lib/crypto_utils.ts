@@ -25,11 +25,11 @@ export type Crv = "P-256" | "P-384" | "P-521";
 export type Hsh = "SHA-256" | "SHA-384" | "SHA-512";
 
 /** JWK values for the key types that are relevant for this package */
-export type Kty = "EC" | "RSA";
+export type Kty = "EC" | "RSA" | "OKP";
 
 interface WebCryptoAPIData {
     name:         string,
-    hash:         Hsh;
+    hash ?:       Hsh;
     saltLength?:  number;
     namedCurve ?: Crv;
 }
@@ -73,7 +73,7 @@ const RsaAlgs: Record<Alg, WebCryptoAPIData> = {
  * @param key 
  * @returns 
  */
-function algorithmData(report: Errors, key: JsonWebKey): WebCryptoAPIData | null {
+export function algorithmData(report: Errors, key: JsonWebKey): WebCryptoAPIData | null {
     switch (key.kty as Kty) {
         case "RSA" : {
             try {
@@ -83,11 +83,16 @@ function algorithmData(report: Errors, key: JsonWebKey): WebCryptoAPIData | null
                 return null;
             }
         }
-        case "EC": default: {
+        case "EC": {
             return {
                 name: "ECDSA",
                 namedCurve: key.crv as Crv,
-                hash: DEFAULT_HASH
+                hash: (key.crv as Crv) === "P-256" ? "SHA-256" : "SHA-384",
+            };
+        }
+        case "OKP": default: {
+            return {
+                name: "Ed25519"
             };
         }
     }   

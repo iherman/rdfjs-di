@@ -25,9 +25,6 @@ async function generateKey(suite: Cryptosuites, keyData?: KeyDetails): Promise<C
     return newPair.publicKey;
 }
 
-
-
-
 (async () => {
     const key = await generateKey(Cryptosuites.ecdsa, {namedCurve: "P-384"});
     const { cryptosuite, multikey } = await keyToMultikey(key);
