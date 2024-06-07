@@ -1,4 +1,4 @@
-import { canonicalize } from "@tufjs/canonical-json";
+import { canonify }     from '@truestamp/canonify';
 import * as fs          from 'node:fs/promises';
 import { KeyData }      from '../../index';
 
@@ -28,7 +28,7 @@ export class OSet<T> implements ObjectSet<T> {
     }
 
     private canon(term: T): string {
-        return canonicalize(term);
+        return canonify(term);
     }
 
     get size(): number {

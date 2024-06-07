@@ -27,6 +27,10 @@ export type Hsh = "SHA-256" | "SHA-384" | "SHA-512";
 /** JWK values for the key types that are relevant for this package */
 export type Kty = "EC" | "RSA" | "OKP";
 
+/** 
+ * Interface to the Web Crypto information that has to be provided for the
+ * creation of some RSA encryption keys.  
+ */
 interface WebCryptoAPIData {
     name:         string,
     hash ?:       Hsh;
@@ -67,7 +71,7 @@ const RsaAlgs: Record<Alg, WebCryptoAPIData> = {
 }
 
 /**
- * Mapping of the JWK instance and the corresponding terms for the WebCrypto API
+ * Mapping of the JWK instance and the corresponding terms for the WebCrypto API.
  * 
  * @param report 
  * @param key 

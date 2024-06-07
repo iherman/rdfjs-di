@@ -10,12 +10,14 @@
  * @packageDocumentation
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyProofGraphs = exports.generateAProofGraph = exports.xsd_datetime = exports.sec_created = exports.sec_revoked = exports.sec_expires = exports.sec_verificationMethod = exports.sec_assertionMethod = exports.sec_authenticationMethod = exports.sec_proofPurpose = exports.sec_publicKeyJwk = exports.sec_proofValue = exports.sec_di_proof = exports.sec_proof = exports.rdf_type = exports.xsd_prefix = exports.rdf_prefix = exports.sec_prefix = void 0;
+exports.verifyProofGraphs = exports.generateAProofGraph = exports.xsd_datetime = exports.sec_created = exports.sec_revoked = exports.sec_expires = exports.sec_verificationMethod = exports.sec_assertionMethod = exports.sec_authenticationMethod = exports.sec_proofPurpose = exports.sec_publicKeyMultibase = exports.sec_publicKeyJwk = exports.sec_proofValue = exports.sec_di_proof = exports.sec_proof = exports.rdf_json = exports.rdf_type = exports.xsd_prefix = exports.rdf_prefix = exports.sec_prefix = void 0;
 const n3 = require("n3");
 const uuid_1 = require("uuid");
+const canonify_1 = require("@truestamp/canonify");
 const types = require("./types");
 const utils_1 = require("./utils");
 const crypto_utils_1 = require("./crypto_utils");
+const multikey_1 = require("./multikey");
 // n3.DataFactory is a namespace with some functions...
 const { namedNode, literal, quad } = n3.DataFactory;
 /***************************************************************************************
@@ -26,10 +28,12 @@ exports.sec_prefix = (0, utils_1.createPrefix)("https://w3id.org/security#");
 exports.rdf_prefix = (0, utils_1.createPrefix)("http://www.w3.org/1999/02/22-rdf-syntax-ns#");
 exports.xsd_prefix = (0, utils_1.createPrefix)("http://www.w3.org/2001/XMLSchema#");
 exports.rdf_type = (0, exports.rdf_prefix)('type');
+exports.rdf_json = (0, exports.rdf_prefix)('JSON');
 exports.sec_proof = (0, exports.sec_prefix)('proof');
 exports.sec_di_proof = (0, exports.sec_prefix)('DataIntegrityProof');
 exports.sec_proofValue = (0, exports.sec_prefix)('proofValue');
 exports.sec_publicKeyJwk = (0, exports.sec_prefix)('publicKeyJwk');
+exports.sec_publicKeyMultibase = (0, exports.sec_prefix)('publicKeyMultibase');
 exports.sec_proofPurpose = (0, exports.sec_prefix)('proofPurpose');
 exports.sec_authenticationMethod = (0, exports.sec_prefix)('authenticationMethod');
 exports.sec_assertionMethod = (0, exports.sec_prefix)('assertionMethod');
@@ -38,6 +42,37 @@ exports.sec_expires = (0, exports.sec_prefix)('expires');
 exports.sec_revoked = (0, exports.sec_prefix)('revoked');
 exports.sec_created = (0, exports.sec_prefix)('created');
 exports.xsd_datetime = (0, exports.xsd_prefix)('dateTime');
+/**
+ * The proof option graph is the collection of all quads in a proof graph, except the proof
+ * value. The hash of this graph is combined with the hash of the original data.
+ *
+ * This function does one more step before hashing: it canonicalizes the (possible) JWK key. This
+ * key is in a JSON Literal; this must be canonicalized to ensure a proper validation.
+ *
+ * @param proofGraph
+ * @returns
+ */
+async function calculateProofOptionsHash(proofGraph) {
+    const proofOptions = new n3.Store();
+    // The proof option graph is a copy of the proof graph quads, except that:
+    // 1. the proof value triple should be removed
+    // 2. the value of the sec_publicKeyJwk must be canonicalized
+    for (const q of proofGraph) {
+        if (q.predicate.value === exports.sec_proofValue.value) {
+            continue;
+        }
+        else if (q.predicate.value === exports.sec_publicKeyJwk.value) {
+            // get the JSON value from the object
+            const jwk = JSON.parse(q.object.value);
+            proofOptions.addQuad(q.subject, q.predicate, literal((0, canonify_1.canonify)(jwk), exports.rdf_json), q.graph);
+        }
+        else {
+            proofOptions.add(q);
+        }
+    }
+    // The return value must be the hash of the proof option graph
+    return await (0, utils_1.calculateDatasetHash)(proofGraph);
+}
 /**
  * Generate a (separate) proof graph, per the DI spec. The signature is stored in
  * [multibase format](https://www.w3.org/TR/vc-data-integrity/#multibase-0), using base64url encoding.
@@ -49,41 +84,69 @@ exports.xsd_datetime = (0, exports.xsd_prefix)('dateTime');
  */
 async function generateAProofGraph(report, hashValue, keyData) {
     const cryptosuite = keyData?.cryptosuite || (0, crypto_utils_1.cryptosuiteId)(report, keyData);
-    // Create a proof graph. Just a boring set of quad generations...
-    const createProofGraph = (proofValue) => {
-        const retval = new n3.Store();
-        // Unique URL-s, for the time being as uuid-s
-        const proofGraphId = `urn:uuid:${(0, uuid_1.v4)()}`;
-        const proofGraph = namedNode(proofGraphId);
-        const verificationMethodId = `urn:uuid:${(0, uuid_1.v4)()}`;
-        const keyResource = namedNode(verificationMethodId);
-        retval.addQuads([
-            quad(proofGraph, exports.rdf_type, exports.sec_di_proof),
-            quad(proofGraph, (0, exports.sec_prefix)('cryptosuite'), literal(cryptosuite)),
-            quad(proofGraph, exports.sec_verificationMethod, keyResource),
-            quad(proofGraph, exports.sec_proofValue, literal(proofValue)),
-            quad(proofGraph, exports.sec_created, literal((new Date()).toISOString(), exports.xsd_datetime)),
-            quad(proofGraph, exports.sec_proofPurpose, exports.sec_authenticationMethod),
-            quad(proofGraph, exports.sec_proofPurpose, exports.sec_assertionMethod),
-            quad(keyResource, exports.rdf_type, (0, exports.sec_prefix)('JsonWebKey')),
-            quad(keyResource, exports.sec_publicKeyJwk, literal(JSON.stringify(keyData.public), (0, exports.rdf_prefix)('JSON'))),
-        ]);
-        if (keyData.controller)
-            retval.add(quad(keyResource, (0, exports.sec_prefix)('controller'), namedNode(keyData.controller)));
-        if (keyData.expires)
-            retval.add(quad(keyResource, exports.sec_expires, literal(keyData.expires, exports.xsd_datetime)));
-        if (keyData.revoked)
-            retval.add(quad(keyResource, exports.sec_revoked, literal(keyData.revoked, exports.xsd_datetime)));
+    // Generate the key data to be stored in the proof graph; either multikey or jwk, depending on the cryptosuite
+    const addKeyResource = async (jsonKey, proofGraph, keyResource) => {
+        let retval = [];
+        if (jsonKey.kty === "OKP" || jsonKey.kty === "EC") {
+            // We are in multikey land...
+            const key = await crypto.subtle.importKey("jwk", jsonKey, (0, crypto_utils_1.algorithmData)(report, jsonKey), true, ['verify']);
+            const { cryptosuite, multikey } = await (0, multikey_1.keyToMultikey)(key);
+            retval = [
+                quad(proofGraph, (0, exports.sec_prefix)('cryptosuite'), literal(cryptosuite)),
+                quad(keyResource, exports.rdf_type, (0, exports.sec_prefix)('Multikey')),
+                quad(keyResource, exports.sec_publicKeyMultibase, literal(multikey)),
+            ];
+        }
+        else {
+            retval = [
+                quad(proofGraph, (0, exports.sec_prefix)('cryptosuite'), literal(cryptosuite)),
+                quad(keyResource, exports.rdf_type, (0, exports.sec_prefix)('JsonWebKey')),
+                quad(keyResource, exports.sec_publicKeyJwk, literal(JSON.stringify(jsonKey), exports.rdf_json)),
+            ];
+        }
         return retval;
     };
-    const signature = await (0, crypto_utils_1.sign)(report, hashValue, keyData.private);
+    // Create a proof graph. Just a boring set of quad generations...
+    const createProofOptionGraph = async () => {
+        const proofGraph = new n3.Store();
+        // Unique URL-s, for the time being as uuid-s
+        const proofGraphResource = namedNode(`urn:uuid:${(0, uuid_1.v4)()}`);
+        const verificationMethodId = `urn:uuid:${(0, uuid_1.v4)()}`;
+        const keyResource = namedNode(verificationMethodId);
+        // Create the resource for the proof graph itself, referring to a separate key resource
+        proofGraph.addQuads([
+            quad(proofGraphResource, exports.rdf_type, exports.sec_di_proof),
+            quad(proofGraphResource, exports.sec_verificationMethod, keyResource),
+            quad(proofGraphResource, exports.sec_created, literal((new Date()).toISOString(), exports.xsd_datetime)),
+            quad(proofGraphResource, exports.sec_proofPurpose, exports.sec_authenticationMethod),
+            quad(proofGraphResource, exports.sec_proofPurpose, exports.sec_assertionMethod)
+        ]);
+        // Create the separate key resource triples (within the same graph)
+        if (keyData.controller)
+            proofGraph.add(quad(keyResource, (0, exports.sec_prefix)('controller'), namedNode(keyData.controller)));
+        if (keyData.expires)
+            proofGraph.add(quad(keyResource, exports.sec_expires, literal(keyData.expires, exports.xsd_datetime)));
+        if (keyData.revoked)
+            proofGraph.add(quad(keyResource, exports.sec_revoked, literal(keyData.revoked, exports.xsd_datetime)));
+        proofGraph.addQuads(await addKeyResource(keyData.public, proofGraphResource, keyResource));
+        return { proofGraph, proofGraphResource };
+    };
+    // Put together the proof option graph and calculate its hash
+    const { proofGraph, proofGraphResource } = await createProofOptionGraph();
+    const proofOptionHashValue = await calculateProofOptionsHash(proofGraph);
+    // This is the extra trick in the cryptosuite specifications: the signature is upon the 
+    // concatenation of the original dataset's hash and the hash of the proof option graph.
+    const signature = await (0, crypto_utils_1.sign)(report, hashValue + proofOptionHashValue, keyData.private);
+    // Close up...
     if (signature === null) {
         // An error has occurred during signature; details are in the report.
         // No proof graph is generated
         return new n3.Store();
     }
     else {
-        return createProofGraph(signature);
+        // Add the signature value to the proof graph
+        proofGraph.add(quad(proofGraphResource, exports.sec_proofValue, literal(signature)));
+        return proofGraph;
     }
 }
 exports.generateAProofGraph = generateAProofGraph;
@@ -123,7 +186,7 @@ async function verifyAProofGraph(report, hash, proof, proofId) {
         }
         return proof_values[0].object.value;
     };
-    const getPublicKey = (store) => {
+    const getPublicKey = async (store) => {
         // first see if the verificationMethod has been set properly
         const verificationMethod = store.getQuads(null, exports.sec_verificationMethod, null, null);
         if (verificationMethod.length === 0) {
@@ -134,14 +197,6 @@ async function verifyAProofGraph(report, hash, proof, proofId) {
             localErrors.push(new types.Malformed_Proof_Error("Several verification methods"));
         }
         const publicKey = verificationMethod[0].object;
-        const keys = store.getQuads(publicKey, exports.sec_publicKeyJwk, null, null);
-        if (keys.length === 0) {
-            localErrors.push(new types.Invalid_Verification_Method(`No key values`));
-            return null;
-        }
-        else if (keys.length > 1) {
-            localErrors.push(new types.Invalid_Verification_Method("More than one keys provided"));
-        }
         // Check the creation/expiration/revocation dates, if any...
         const now = new Date();
         const creationDates = store.getQuads(null, exports.sec_created, null, null);
@@ -164,12 +219,49 @@ async function verifyAProofGraph(report, hash, proof, proofId) {
                 return null;
             }
         }
-        try {
-            return JSON.parse(keys[0].object.value);
+        // All conditions are fulfilled, the key can now be retrieved and returned 
+        // The key itself can be in JWK or in Multikey format
+        const keys_jwk = store.getQuads(publicKey, exports.sec_publicKeyJwk, null, null);
+        const keys_multikey = store.getQuads(publicKey, exports.sec_publicKeyMultibase, null, null);
+        // Both arrays cannot exist at the same time!
+        if (keys_jwk.length > 0 && keys_multikey.length > 0) {
+            localWarnings.push(new types.Malformed_Proof_Error(`JWK or Multikey formats can be used, but not both.`));
+            return null;
         }
-        catch (e) {
-            // This happens if there is a JSON parse error with the key...
-            localWarnings.push(new types.Malformed_Proof_Error(`Parsing error for JWK: ${e.message}`));
+        else if (keys_jwk.length === 0) {
+            // Trying Multikey, JWK is not used...
+            if (keys_multikey.length === 0) {
+                localErrors.push(new types.Invalid_Verification_Method(`No key values`));
+                return null;
+            }
+            else if (keys_multikey.length === 1) {
+                try {
+                    const key = await (0, multikey_1.multikeyToKey)(keys_multikey[0].object.value);
+                    return crypto.subtle.exportKey('jwk', key);
+                }
+                catch (e) {
+                    localWarnings.push(new types.Malformed_Proof_Error(`Parsing error for Multikey: ${e.message}`));
+                    return null;
+                }
+            }
+            else {
+                localErrors.push(new types.Invalid_Verification_Method("More than one Multikey encoded keys"));
+                return null;
+            }
+        }
+        else if (keys_jwk.length === 1) {
+            // We have a JWK key, we can return it if it parses o.k.
+            try {
+                return JSON.parse(keys_jwk[0].object.value);
+            }
+            catch (e) {
+                // This happens if there is a JSON parse error with the key...
+                localWarnings.push(new types.Malformed_Proof_Error(`Parsing error for JWK: ${e.message}`));
+                return null;
+            }
+        }
+        else {
+            localErrors.push(new types.Invalid_Verification_Method("More than one JWK encoded keys"));
             return null;
         }
     };
@@ -193,7 +285,7 @@ async function verifyAProofGraph(report, hash, proof, proofId) {
     };
     // Retrieve necessary values with checks
     checkProofPurposes(proof);
-    const publicKey = getPublicKey(proof);
+    const publicKey = await getPublicKey(proof);
     const proofValue = getProofValue(proof);
     // The final set of error/warning should be modified with the proof graph's ID, if applicable
     if (proofId !== undefined) {
@@ -208,7 +300,9 @@ async function verifyAProofGraph(report, hash, proof, proofId) {
     report.warnings = [...report.warnings, ...localWarnings];
     // Here we go with checking...
     if (publicKey !== null && proofValue !== null) {
-        const check_results = await (0, crypto_utils_1.verify)(report, hash, proofValue, publicKey);
+        // First the proof option graph must be created and then hashed
+        const proofOptionGraphHash = await calculateProofOptionsHash(proof);
+        const check_results = await (0, crypto_utils_1.verify)(report, hash + proofOptionGraphHash, proofValue, publicKey);
         // the return value should nevertheless be false if there have been errors
         return check_results ? localErrors.length === 0 : true;
     }

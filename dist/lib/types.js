@@ -9,6 +9,7 @@ exports.Unclassified_Error = exports.Invalid_Verification_Method = exports.Misma
 var Cryptosuites;
 (function (Cryptosuites) {
     Cryptosuites["ecdsa"] = "ecdsa-rdfc-2019";
+    Cryptosuites["eddsa"] = "eddsa-rdfc-2022";
     Cryptosuites["rsa_pss"] = "rsa-pss-rdfc-ih";
     Cryptosuites["rsa_ssa"] = "rsa-ssa-rdfc-ih";
 })(Cryptosuites || (exports.Cryptosuites = Cryptosuites = {}));

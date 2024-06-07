@@ -17,8 +17,7 @@
         },
         "resolveJsonModule": true,
         "sourceMap": false,
-        "target": "esnext",
-        "allowImportingTsExtensions": true
+        "target": "esnext"
     },
     "typesRoots": ["types", "node_modules/@types"],
     "include": ["lib/**/*", "index.ts"],

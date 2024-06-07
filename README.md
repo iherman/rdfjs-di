@@ -45,3 +45,36 @@ For more details, see:
 - [A small RDF graph](https://github.com/iherman/rdfjs-di/blob/main/examples/small.ttl) and its ["verifiable" version with embedded proof graphs](https://github.com/iherman/rdfjs-di/blob/main/examples/small_with_proofs.ttl) 
 
 (Note that the API works on an RDF Data model level, and does not include a Turtle/TriG parser or serializer; that should be done separately.)
+
+## Examples
+
+```typescript
+import * as rdf from '@rdfjs/types';
+import { KeyData, generateProofGraph, VerificationResult } from 'rdfjs-di';
+
+const dataset: rdf.DatasetCore = generateYourDataset();
+const keyPair: KeyData = generateYourWebCryptoKeyPair();
+
+// 'proof' is a separate RDF graph with the keys, metadata, and the signature
+const proof: rdf.DatasetCore = await generateProofGraph(dataset, keyPair)
+
+// You can verify the information
+const result: VerificationResult = await verifyProofGraph(dataset, proof);
+
+// If everything is fine, this should be true
+console.log(result.verified);
+
+// The proof can also be embedded into the result
+const embeddedProof: rdf.DatasetCore = await embedProofGraph(dataset, keyPair, anchorResource);
+
+// This can be verified as before
+const embeddedResult: VerificationResult = await verifyEmbeddedProofGraph(proof, anchor);
+
+// There may be several keys, in which case an array of proofs are created:
+const keypairs: KeyData[] = generateYourWebCryptoKeyPairs();
+
+// The function interfaces are all overloaded, so the call format does not really change:
+const proofs: rdf.DatasetCore[] = await generateProofGraph(dataset, keyPairs);
+
+// etc.
+```

@@ -26,11 +26,11 @@ const { quad } = n3.DataFactory;
 
 /**
  * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in 
- * multibase format, using base64url encoding. Keys are accepted, and stored in JWK format.
+ * multibase format, using base64url encoding. Keys are accepted in JWK format (and stored in JWK or in Multikey, depending on the crypto key).
  * 
  * @param dataset 
  * @param keyData 
- * @throws - an error if there was a key issue while signing.
+ * @throws - Error if there was an issue while signing.
  * @returns 
  */
 export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: Iterable<KeyData>): Promise<rdf.DatasetCore[]>;
@@ -65,7 +65,7 @@ export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyD
  * The following checks are made:
  * 
  * 1. There should be exactly one [proof value](https://www.w3.org/TR/vc-data-integrity/#dfn-proofvalue)
- * 2. There should be exactly one [verification method](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod), which should be a separate resource containing the key (in JWK)
+ * 2. There should be exactly one [verification method](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod), which should be a separate resource containing the key (either in JWK or in Multikey)
  * 3. The key's (optional) [expiration](https://www.w3.org/TR/vc-data-integrity/#defn-proof-expires) and 
  * [revocation](https://www.w3.org/TR/vc-data-integrity/#dfn-revoked) dates are checked and compared to the current time which should be "before"
  * 4. The proof's [creation date](https://www.w3.org/TR/vc-data-integrity/#dfn-created) must be before the current time
@@ -164,7 +164,7 @@ export async function embedProofGraph(dataset: rdf.DatasetCore, keyData: KeyData
  * The following checks are also made.
  * 
  * 1. There should be exactly one [proof value](https://www.w3.org/TR/vc-data-integrity/#dfn-proofvalue)
- * 2. There should be exactly one [verification method](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod), which should be a separate resource containing the key (in JWK)
+ * 2. There should be exactly one [verification method](https://www.w3.org/TR/vc-data-integrity/#dfn-verificationmethod), which should be a separate resource containing the key (either in JWK or in Multikey)
  * 3. The key's (optional) [expiration](https://www.w3.org/TR/vc-data-integrity/#defn-proof-expires) and 
  * [revocation](https://www.w3.org/TR/vc-data-integrity/#dfn-revoked) dates are checked and compared to the current time which should be "before"
  * 4. The proof's [creation date](https://www.w3.org/TR/vc-data-integrity/#dfn-created) must be before the current time

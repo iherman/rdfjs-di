@@ -13,7 +13,7 @@
  * @packageDocumentation
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateKey = exports.cryptosuiteId = exports.verify = exports.sign = void 0;
+exports.generateKey = exports.cryptosuiteId = exports.verify = exports.sign = exports.algorithmData = void 0;
 const types = require("./types");
 const types_1 = require("./types");
 /***********************************************************************************
@@ -39,7 +39,7 @@ const RsaAlgs = {
     "RS512": { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' },
 };
 /**
- * Mapping of the JWK instance and the corresponding terms for the WebCrypto API
+ * Mapping of the JWK instance and the corresponding terms for the WebCrypto API.
  *
  * @param report
  * @param key
@@ -56,16 +56,22 @@ function algorithmData(report, key) {
                 return null;
             }
         }
-        case "EC":
-        default: {
+        case "EC": {
             return {
                 name: "ECDSA",
                 namedCurve: key.crv,
-                hash: DEFAULT_HASH
+                hash: key.crv === "P-256" ? "SHA-256" : "SHA-384",
+            };
+        }
+        case "OKP":
+        default: {
+            return {
+                name: "Ed25519"
             };
         }
     }
 }
+exports.algorithmData = algorithmData;
 /**
  * Export a WebCrypto crypto key pair into their JWK equivalent.
  *
@@ -228,6 +234,7 @@ function cryptosuiteId(report, keyPair) {
     else {
         switch (alg.name) {
             case "ECDSA": return types_1.Cryptosuites.ecdsa;
+            case "Ed25519": return types_1.Cryptosuites.eddsa;
             case "RSA-PSS": return types_1.Cryptosuites.rsa_pss;
             case "RSASSA-PKCS1-v1_5": return types_1.Cryptosuites.rsa_ssa;
             default: {
@@ -254,6 +261,9 @@ async function generateKey(suite, metadata, keyData) {
             case types_1.Cryptosuites.ecdsa: return {
                 name: "ECDSA",
                 namedCurve: keyData?.namedCurve || DEFAULT_CURVE,
+            };
+            case types_1.Cryptosuites.eddsa: return {
+                name: "Ed25519"
             };
             case types_1.Cryptosuites.rsa_pss: return {
                 name: "RSA-PSS",

@@ -19,13 +19,31 @@ export type Crv = "P-256" | "P-384" | "P-521";
 /** JWK values for the hash methods that are relevant for this package */
 export type Hsh = "SHA-256" | "SHA-384" | "SHA-512";
 /** JWK values for the key types that are relevant for this package */
-export type Kty = "EC" | "RSA";
+export type Kty = "EC" | "RSA" | "OKP";
+/**
+ * Interface to the Web Crypto information that has to be provided for the
+ * creation of some RSA encryption keys.
+ */
+interface WebCryptoAPIData {
+    name: string;
+    hash?: Hsh;
+    saltLength?: number;
+    namedCurve?: Crv;
+}
 /** Information that may be used when generating new keys */
 export interface KeyDetails {
     namedCurve?: Crv;
     hash?: Hsh;
     modulusLength?: number;
 }
+/**
+ * Mapping of the JWK instance and the corresponding terms for the WebCrypto API.
+ *
+ * @param report
+ * @param key
+ * @returns
+ */
+export declare function algorithmData(report: Errors, key: JsonWebKey): WebCryptoAPIData | null;
 /***********************************************************************************
  *
  * The externally visible API entries
@@ -73,3 +91,4 @@ export declare function cryptosuiteId(report: Errors, keyPair: KeyPair): Cryptos
  * @returns
  */
 export declare function generateKey(suite: Cryptosuites, metadata?: KeyMetadata, keyData?: KeyDetails): Promise<KeyData>;
+export {};
