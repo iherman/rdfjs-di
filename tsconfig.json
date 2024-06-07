@@ -17,9 +17,10 @@
         },
         "resolveJsonModule": true,
         "sourceMap": false,
-        "target": "esnext"
+        "target": "esnext",
+        "allowImportingTsExtensions": true
     },
-    "typesRoots": ["node_modules/@types"],
+    "typesRoots": ["types", "node_modules/@types"],
     "include": ["lib/**/*", "index.ts"],
     "exclude": ["extras/**/*", "example/**/*", "testing/**/*", "tester/**/*", "Attic/**/*"],
     "typedocOptions": {

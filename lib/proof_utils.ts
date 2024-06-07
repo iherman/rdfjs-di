@@ -13,11 +13,13 @@
 import * as rdf       from '@rdfjs/types';
 import * as n3        from 'n3';
 import { v4 as uuid } from 'uuid';
+import { canonify }   from '@truestamp/canonify';
 
-import * as types                      from './types';
-import { Errors, KeyData }             from './types';
-import { createPrefix, GraphWithID }   from './utils';
-import { sign, verify, cryptosuiteId } from './crypto_utils';
+import * as types                                          from './types';
+import { Errors, KeyData }                                 from './types';
+import { createPrefix, GraphWithID, calculateDatasetHash } from './utils';
+import { sign, verify, cryptosuiteId, algorithmData }      from './crypto_utils';
+import { multikeyToKey, keyToMultikey }                    from './multikey';
 
 // n3.DataFactory is a namespace with some functions...
 const { namedNode, literal, quad } = n3.DataFactory;
@@ -32,10 +34,12 @@ export const rdf_prefix = createPrefix("http://www.w3.org/1999/02/22-rdf-syntax-
 export const xsd_prefix = createPrefix("http://www.w3.org/2001/XMLSchema#");
 
 export const rdf_type: rdf.NamedNode                 = rdf_prefix('type');
+export const rdf_json: rdf.NamedNode                 = rdf_prefix('JSON');
 export const sec_proof: rdf.NamedNode                = sec_prefix('proof');
 export const sec_di_proof: rdf.NamedNode             = sec_prefix('DataIntegrityProof');
 export const sec_proofValue: rdf.NamedNode           = sec_prefix('proofValue');
 export const sec_publicKeyJwk: rdf.NamedNode         = sec_prefix('publicKeyJwk');
+export const sec_publicKeyMultibase: rdf.NamedNode   = sec_prefix('publicKeyMultibase');
 export const sec_proofPurpose: rdf.NamedNode         = sec_prefix('proofPurpose');
 export const sec_authenticationMethod: rdf.NamedNode = sec_prefix('authenticationMethod');
 export const sec_assertionMethod: rdf.NamedNode      = sec_prefix('assertionMethod');
@@ -44,6 +48,38 @@ export const sec_expires: rdf.NamedNode              = sec_prefix('expires');
 export const sec_revoked: rdf.NamedNode              = sec_prefix('revoked');
 export const sec_created: rdf.NamedNode              = sec_prefix('created');
 export const xsd_datetime: rdf.NamedNode             = xsd_prefix('dateTime');
+
+
+/**
+ * The proof option graph is the collection of all quads in a proof graph, except the proof
+ * value. The hash of this graph is combined with the hash of the original data.
+ * 
+ * This function does one more step before hashing: it canonicalizes the (possible) JWK key. This
+ * key is in a JSON Literal; this must be canonicalized to ensure a proper validation.
+ * 
+ * @param proofGraph 
+ * @returns 
+ */
+async function calculateProofOptionsHash(proofGraph: rdf.DatasetCore): Promise<string> {
+    const proofOptions = new n3.Store();
+    // The proof option graph is a copy of the proof graph quads, except that:
+    // 1. the proof value triple should be removed
+    // 2. the value of the sec_publicKeyJwk must be canonicalized
+    for (const q of proofGraph) {
+        if (q.predicate.value === sec_proofValue.value){
+            continue;
+        } else if (q.predicate.value === sec_publicKeyJwk.value) {
+            // get the JSON value from the object
+            const jwk = JSON.parse(q.object.value);
+            proofOptions.addQuad(q.subject, q.predicate, literal(canonify(jwk), rdf_json), q.graph);
+        } else {
+            proofOptions.add(q);
+        }
+    }
+
+    // The return value must be the hash of the proof option graph
+    return await calculateDatasetHash(proofGraph);
+}
 
 
 /**
@@ -58,60 +94,83 @@ export const xsd_datetime: rdf.NamedNode             = xsd_prefix('dateTime');
 export async function generateAProofGraph(report: Errors, hashValue: string, keyData: KeyData): Promise <rdf.DatasetCore> {
     const cryptosuite = keyData?.cryptosuite || cryptosuiteId(report, keyData)
 
+    // Generate the key data to be stored in the proof graph; either multikey or jwk, depending on the cryptosuite
+    const addKeyResource = async (jsonKey: JsonWebKey, proofGraph: rdf.Quad_Subject, keyResource: rdf.Quad_Subject): Promise<rdf.Quad[]> => {
+        let retval: rdf.Quad[] = [];
+        if (jsonKey.kty === "OKP" || jsonKey.kty === "EC") {
+            // We are in multikey land...
+            const key = await crypto.subtle.importKey("jwk", jsonKey, algorithmData(report, jsonKey), true, ['verify']);
+            const {cryptosuite, multikey} = await keyToMultikey(key);
+            retval = [
+                quad(proofGraph, sec_prefix('cryptosuite'), literal(cryptosuite)),
+                quad(keyResource, rdf_type, sec_prefix('Multikey')),
+                quad(keyResource, sec_publicKeyMultibase, literal(multikey)),
+            ];
+        } else {
+            retval = [
+                quad(proofGraph, sec_prefix('cryptosuite'), literal(cryptosuite)),
+                quad(keyResource, rdf_type, sec_prefix('JsonWebKey')),
+                quad(keyResource, sec_publicKeyJwk, literal(JSON.stringify(jsonKey), rdf_json)),
+            ];
+        }
+        return retval;
+    }
+
     // Create a proof graph. Just a boring set of quad generations...
-    const createProofGraph = (proofValue: string): rdf.DatasetCore => {
-        const retval: n3.Store = new n3.Store();
+    const createProofOptionGraph = async (): Promise<{ proofGraph: rdf.DatasetCore, proofGraphResource: rdf.NamedNode}> => {
+        const proofGraph: n3.Store = new n3.Store();
 
         // Unique URL-s, for the time being as uuid-s
-        const proofGraphId = `urn:uuid:${uuid()}`;
-        const proofGraph = namedNode(proofGraphId);
+        const proofGraphResource = namedNode(`urn:uuid:${uuid()}`);
 
         const verificationMethodId = `urn:uuid:${uuid()}`;
         const keyResource = namedNode(verificationMethodId);
 
-        retval.addQuads([
+        // Create the resource for the proof graph itself, referring to a separate key resource
+        proofGraph.addQuads([
             quad(
-                proofGraph, rdf_type, sec_di_proof
+                proofGraphResource, rdf_type, sec_di_proof
             ),
             quad(
-                proofGraph, sec_prefix('cryptosuite'), literal(cryptosuite)
+                proofGraphResource, sec_verificationMethod, keyResource
             ),
             quad(
-                proofGraph, sec_verificationMethod, keyResource
+                proofGraphResource, sec_created, literal((new Date()).toISOString(), xsd_datetime)
             ),
             quad(
-                proofGraph, sec_proofValue, literal(proofValue)
+                proofGraphResource, sec_proofPurpose, sec_authenticationMethod
             ),
             quad(
-                proofGraph, sec_created, literal((new Date()).toISOString(), xsd_datetime)
-            ),
-            quad(
-                proofGraph, sec_proofPurpose, sec_authenticationMethod
-            ),
-            quad(
-                proofGraph, sec_proofPurpose, sec_assertionMethod
-            ),
-
-            quad(
-                keyResource, rdf_type, sec_prefix('JsonWebKey')
-            ),
-            quad(
-                keyResource, sec_publicKeyJwk, literal(JSON.stringify(keyData.public), rdf_prefix('JSON'))
-            ),
+                proofGraphResource, sec_proofPurpose, sec_assertionMethod
+            )
         ]);
-        if (keyData.controller) retval.add(quad(keyResource, sec_prefix('controller'), namedNode(keyData.controller)));
-        if (keyData.expires) retval.add(quad(keyResource, sec_expires, literal(keyData.expires, xsd_datetime)));
-        if (keyData.revoked) retval.add(quad(keyResource, sec_revoked, literal(keyData.revoked, xsd_datetime)));
-        return retval;
+
+        // Create the separate key resource triples (within the same graph)
+        if (keyData.controller) proofGraph.add(quad(keyResource, sec_prefix('controller'), namedNode(keyData.controller)));
+        if (keyData.expires) proofGraph.add(quad(keyResource, sec_expires, literal(keyData.expires, xsd_datetime)));
+        if (keyData.revoked) proofGraph.add(quad(keyResource, sec_revoked, literal(keyData.revoked, xsd_datetime)));
+        proofGraph.addQuads(await addKeyResource(keyData.public, proofGraphResource, keyResource));
+
+        return { proofGraph, proofGraphResource }
     };
 
-    const signature = await sign(report, hashValue, keyData.private);
+    // Put together the proof option graph and calculate its hash
+    const { proofGraph, proofGraphResource } = await createProofOptionGraph();
+    const proofOptionHashValue  = await calculateProofOptionsHash(proofGraph);
+
+    // This is the extra trick in the cryptosuite specifications: the signature is upon the 
+    // concatenation of the original dataset's hash and the hash of the proof option graph.
+    const signature = await sign(report, hashValue + proofOptionHashValue, keyData.private);
+
+    // Close up...
     if (signature === null) {
         // An error has occurred during signature; details are in the report.
         // No proof graph is generated
         return new n3.Store();
     } else {
-        return createProofGraph(signature);
+        // Add the signature value to the proof graph
+        proofGraph.add(quad(proofGraphResource, sec_proofValue, literal(signature)));
+        return proofGraph;
     }
 };
 
@@ -151,7 +210,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
         return proof_values[0].object.value;
     };
 
-    const getPublicKey = (store: n3.Store): JsonWebKey | null => {
+    const getPublicKey = async (store: n3.Store): Promise<JsonWebKey | null> => {
         // first see if the verificationMethod has been set properly
         const verificationMethod: rdf.Quad[] = store.getQuads(null, sec_verificationMethod, null, null);
         if (verificationMethod.length === 0) {
@@ -162,14 +221,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
         }
 
         const publicKey = verificationMethod[0].object;
-        const keys: rdf.Quad[] = store.getQuads(publicKey, sec_publicKeyJwk, null, null);
-        if (keys.length === 0) {
-            localErrors.push(new types.Invalid_Verification_Method(`No key values`));
-            return null;
-        } else if (keys.length > 1) {
-            localErrors.push(new types.Invalid_Verification_Method("More than one keys provided"));
-        }
-
+   
         // Check the creation/expiration/revocation dates, if any...
         const now = new Date();
         const creationDates: rdf.Quad[] = store.getQuads(null, sec_created, null, null);
@@ -194,13 +246,46 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
             }
         }
 
-        try {
-            return JSON.parse(keys[0].object.value) as JsonWebKey;
-        } catch (e) {
-            // This happens if there is a JSON parse error with the key...
-            localWarnings.push(new types.Malformed_Proof_Error(`Parsing error for JWK: ${e.message}`));
+        // All conditions are fulfilled, the key can now be retrieved and returned 
+        // The key itself can be in JWK or in Multikey format
+        const keys_jwk: rdf.Quad[]      = store.getQuads(publicKey, sec_publicKeyJwk, null, null);
+        const keys_multikey: rdf.Quad[] = store.getQuads(publicKey, sec_publicKeyMultibase, null, null);
+
+        // Both arrays cannot exist at the same time!
+        if (keys_jwk.length > 0 && keys_multikey.length > 0) {
+            localWarnings.push(new types.Malformed_Proof_Error(`JWK or Multikey formats can be used, but not both.`));
+            return null;
+        } else if (keys_jwk.length === 0) {
+            // Trying Multikey, JWK is not used...
+            if (keys_multikey.length === 0) {
+                localErrors.push(new types.Invalid_Verification_Method(`No key values`));
+                return null;
+            } else if (keys_multikey.length === 1) {
+                try {
+                    const key: CryptoKey = await multikeyToKey(keys_multikey[0].object.value);
+                    return crypto.subtle.exportKey('jwk', key);
+                } catch(e) {
+                    localWarnings.push(new types.Malformed_Proof_Error(`Parsing error for Multikey: ${e.message}`));
+                    return null;
+                }
+            } else {
+                localErrors.push(new types.Invalid_Verification_Method("More than one Multikey encoded keys"));
+                return null;
+            }
+        } else if (keys_jwk.length === 1) {
+            // We have a JWK key, we can return it if it parses o.k.
+            try {
+                return JSON.parse(keys_jwk[0].object.value) as JsonWebKey;
+            } catch (e) {
+                // This happens if there is a JSON parse error with the key...
+                localWarnings.push(new types.Malformed_Proof_Error(`Parsing error for JWK: ${e.message}`));
+                return null;
+            }
+        } else {
+            localErrors.push(new types.Invalid_Verification_Method("More than one JWK encoded keys"));
             return null;
         }
+
     };
 
     // Check the "proofPurpose" property value
@@ -223,7 +308,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
 
     // Retrieve necessary values with checks
     checkProofPurposes(proof);
-    const publicKey: JsonWebKey | null = getPublicKey(proof);
+    const publicKey: JsonWebKey | null = await getPublicKey(proof);
     const proofValue: string | null = getProofValue(proof);
 
     // The final set of error/warning should be modified with the proof graph's ID, if applicable
@@ -235,12 +320,14 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
             warning.detail = `${warning.detail} (graph ID: <${proofId.value}>)`;
         });
     }
-    report.errors = [...report.errors, ...localErrors];
+    report.errors   = [...report.errors, ...localErrors];
     report.warnings = [...report.warnings, ...localWarnings];
 
     // Here we go with checking...
     if (publicKey !== null && proofValue !== null) {
-        const check_results = await verify(report, hash, proofValue, publicKey)
+        // First the proof option graph must be created and then hashed
+        const proofOptionGraphHash = await calculateProofOptionsHash(proof);
+        const check_results = await verify(report, hash + proofOptionGraphHash, proofValue, publicKey)
         // the return value should nevertheless be false if there have been errors
         return check_results ? localErrors.length === 0 : true;
     } else {

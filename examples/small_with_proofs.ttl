@@ -1,3 +1,4 @@
+## The original dataset starts here
 @prefix sec: <https://w3id.org/security#>.
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns>.
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
@@ -10,6 +11,7 @@
 <file:///small.ttl> foaf:primaryTopic <https://iherman.github.io/rdfjs-c14n/>;
     dc:issued "2024-02-14T13:21:08.700Z"^^xsd:dateTime;
     foaf:maker <https://www.ivan-herman.net/foaf#me>;
+    # These statements have been added by the program to "anchor" the resource to its various proofs
     sec:proof _:b0, _:b1, _:b2.
 
 <https://iherman.github.io/rdfjs-c14n/> foaf:maker <https://www.ivan-herman.net/foaf#me>;
@@ -45,44 +47,46 @@ _:n3-0 a doap:Version;
 _:n3-1 a doap:GitRepository;
     doap:location <https://github.com/iherman/rdfjs-c14n>.
 
+# The original dataset ends here, the rest are the various proofs
+# Signature based on ECDSA
 _:b0 {
-    <urn:uuid:70b27fe7-89fc-4438-b271-4620b99c61a2> a sec:DataIntegrityProof;
-        sec:cryptosuite "rdfjs-di-rsa-pss";
-        sec:verificationMethod <urn:uuid:1724d7fb-52fd-4426-b2f5-8ca935014460>;
-        sec:proofValue "unTRxbY69Jk5C0G3QO93sAISre0pW77Ws_vTUbXbDzDRuptW_rN4Ps5lNlsrxPRBPtJZIG05LKMCeXYJMEcMP30Lje0M2bIiRSEQcr1ucgY-PEmPYXMlOQhuuXUisUzOgaUdD8OPdajpz2JIhj_lFFXgNCiySEsFkxXzT4nnQg0Vi9b-KS8Raqp097glcT-BjGdx4DBbizVocp6XjAvYoBn3tewpLsCeuqr1Nook2bs6Uff-1veDjZgZHtwB0ImRvvYGI499lO9i7j39WxGMqgS7O1VNsAJMAozSAz2Z_Sk3uOqezJwZbDOygxE2RuZ9gMPGLS4M9W1CrkM9heYUD-w";
-        sec:created "2024-03-07T11:52:00.821Z"^^xsd:dateTime;
-        sec:proofPurpose sec:authenticationMethod, sec:assertionMethod.
+    <urn:uuid:9e8dfbea-3af8-4b91-a7a4-0586338ed8e0> a sec:DataIntegrityProof;
+        sec:verificationMethod <urn:uuid:20fe3a93-f5dd-417a-83b8-d5f518d8cbdd>;
+        sec:created "2024-06-07T12:46:16.794Z"^^xsd:dateTime;
+        sec:proofPurpose sec:authenticationMethod, sec:assertionMethod;
+        sec:cryptosuite "ecdsa-rdfc-2019";
+        sec:proofValue "u49pAWDiPa6WEcEpipXYwQ9LBGvVV6QBLR6XyPSQOGycAYQzk6IzGaKZ2tmYgo8LFectiL-WTH3ryogVIGr_HWQ".
 
-    <urn:uuid:1724d7fb-52fd-4426-b2f5-8ca935014460> a sec:JsonWebKey;
-        sec:publicKeyJwk "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"RSA\",\"n\":\"zX1p6Rl0kTtbFAiISqXQbT9U6kqqIFRfualifsLA5ZNFQMDvuw3cqYUqzIyHAVYV0Bps-mXmwFVjsetQIzqhE0X2VhJ8wBS-bGxm2_E0rQ9y35mN_dWfnVhJYtONrLjkduAk04Xouws60X2ye0QHhG63j0CLNj6bqJQ_fOE_ankHxjGnZ7H7tPIeJfj9Md2GMx98BEr_8iwFXPJ5zT3_ET1zdPUGJV3r6pTOTu5H6sH5457TxCeMIIZfQ3hn3f5lz_5JL5ahtIqZ1BgaAYt5bgg63oqmn67V1fmJ08tx1LT6BbGkt1WQBv8aNgm3Z5ztLWC8MJiqgeFpyQFUOIkVCQ\",\"e\":\"AQAB\",\"alg\":\"PS256\"}"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON>;
+    <urn:uuid:20fe3a93-f5dd-417a-83b8-d5f518d8cbdd> a sec:Multikey;
         sec:controller <https://www.ivan-herman.net#me>;
-        sec:expires "2050-02-24T00:00:00Z"^^xsd:dateTime
+        sec:expires "2055-02-24T00:00:00Z"^^xsd:dateTime;
+        sec:publicKeyMultibase "z4oJ8afhsNVicQJMz5J46thJ84ZBYor4bFL6RBq6F9PdGaV7nUykNfGAQL5PkdqS5THaTVhQQ3oyAtgQsFkY4xNETTxMC"
 }
+
+# Signature based on EdDSA, a.k.a. Ed25519
 _:b1 {
-    <urn:uuid:d86aa537-c465-4882-8c6a-9f81533cce69> a sec:DataIntegrityProof;
-        sec:cryptosuite "ecdsa-2022";
-        sec:verificationMethod <urn:uuid:af11ce93-eb64-4e90-aedc-d8a1ab4cc1d2>;
-        sec:proofValue "uUu0Ht5CMJpKN9ChSlKSAcccKA0Ym14v3jZGXSRBSpMZ82U36AuGaWo3V31M2magZG9kgKtSLhNZRoKg-b8paXg";
-        sec:created "2024-03-07T11:52:00.820Z"^^xsd:dateTime;
+    <urn:uuid:b598fad9-83bf-4690-bf20-951e229d7f74> a sec:DataIntegrityProof;
+        sec:verificationMethod <urn:uuid:0e977e73-183c-4fa2-ace1-eadbe6e3fcb5>;
+        sec:created "2024-06-07T12:46:16.795Z"^^xsd:dateTime;
         sec:proofPurpose sec:authenticationMethod, sec:assertionMethod;
-        sec:previousProof <urn:uuid:70b27fe7-89fc-4438-b271-4620b99c61a2>.
-
-    <urn:uuid:af11ce93-eb64-4e90-aedc-d8a1ab4cc1d2> a sec:JsonWebKey;
-        sec:publicKeyJwk "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"LHGayjy__zWhz14u7vWyGbPWkXNdJN1AnhKiQTv3uK8\",\"y\":\"9T4ThlFhLi84d3LOaOkvrzLrr_EEczB0sIv3S3vzdd8\",\"crv\":\"P-256\"}"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON>;
-        sec:controller <https://www.ivan-herman.net#me>;
-        sec:expires "2055-02-24T00:00:00Z"^^xsd:dateTime
+        sec:cryptosuite "eddsa-rdfc-2022";
+        sec:proofValue "uncVUipaxBRCseZQ5WYoP_6yrCzQ-Uktv926QMoVNir5_bcfewCYys7CIOet3XIxoL9zE-M8Hu61mfuziLYpyCA".
+    <urn:uuid:0e977e73-183c-4fa2-ace1-eadbe6e3fcb5> a sec:Multikey;
+        sec:controller <https://example.org/key/#ivan_eddsa>;
+        sec:expires "2055-02-24T00:00:00Z"^^xsd:dateTime;
+        sec:publicKeyMultibase "z6MkqPUPcdvvixcfgGqqEZJ4WZTiDwaCsqF8jHqR5UZA2iae"
 }
+
+# Signature based on RSA
 _:b2 {
-    <urn:uuid:00bc3d69-7d7f-4b92-88fe-37c4a3da7349> a sec:DataIntegrityProof;
-        sec:cryptosuite "ecdsa-2022";
-        sec:verificationMethod <urn:uuid:382c8f68-3578-4314-a7dc-12bdc3767dd3>;
-        sec:proofValue "ui7tvde12p6kFPzzKQHV4ARYsxY4xXSpHrEC6YSecboeLtUkRKGUh0qgYWy3whj3Lfl0Wj906sLt80hy5dx7nkw";
-        sec:created "2024-03-07T11:52:00.821Z"^^xsd:dateTime;
+    <urn:uuid:aebb1f96-0292-4d9a-b82c-9719e11b75fd> a sec:DataIntegrityProof;
+        sec:verificationMethod <urn:uuid:290fd98d-1df8-482a-a51c-2310b9facb50>;
+        sec:created "2024-06-07T12:46:16.796Z"^^xsd:dateTime;
         sec:proofPurpose sec:authenticationMethod, sec:assertionMethod;
-        sec:previousProof <urn:uuid:d86aa537-c465-4882-8c6a-9f81533cce69>.
-
-    <urn:uuid:382c8f68-3578-4314-a7dc-12bdc3767dd3> a sec:JsonWebKey;
-        sec:publicKeyJwk "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"qtQA8VF1KFsvSfq1BkZP0rODQcQF8x-uL1BXgNcKWIY\",\"y\":\"smHmMXIf9FlkY0pbfrZfuCg0BMviSj8IjMhzTPJehLI\",\"crv\":\"P-256\"}"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON>;
-        sec:controller <https://example.org/key/#alan>
+        sec:cryptosuite "rsa-pss-rdfc-ih";
+        sec:proofValue "uo5HPJflrCyL_QujeHTJa_v1hsZ8HtoPRLjS5-ZJTZlOKIZ-ealplEYRNWasYlvU9ip30nO7aE6VrQ2oixLmEfcgK6wUMr7HKxgynowQRSSU39TEbvMNf-lcU-GzW6QBwxV5lteJDcEkNgC4C6iyEFQfAd0J45m4_y8vQzXOqCYB-his99704AcolDbqtNJ_P8y0dxpciTwdVmrR0NPDfpq4kQYHdiCUWPby4zVRePep2Lo5SzA2jZE060UFuOO1ROguqhtAo-98cYTmI5oj66KDfoC0nOnHdP4lPm97Pxgy0XRcbTIIPBD_51JRYJ1W4zkjQkBO-4eAoxbkOMVbPMg".
+    <urn:uuid:290fd98d-1df8-482a-a51c-2310b9facb50> a sec:JsonWebKey;
+        sec:controller <https://www.ivan-herman.net#me>;
+        sec:expires "2050-02-24T00:00:00Z"^^xsd:dateTime;
+        sec:publicKeyJwk "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"RSA\",\"n\":\"zX1p6Rl0kTtbFAiISqXQbT9U6kqqIFRfualifsLA5ZNFQMDvuw3cqYUqzIyHAVYV0Bps-mXmwFVjsetQIzqhE0X2VhJ8wBS-bGxm2_E0rQ9y35mN_dWfnVhJYtONrLjkduAk04Xouws60X2ye0QHhG63j0CLNj6bqJQ_fOE_ankHxjGnZ7H7tPIeJfj9Md2GMx98BEr_8iwFXPJ5zT3_ET1zdPUGJV3r6pTOTu5H6sH5457TxCeMIIZfQ3hn3f5lz_5JL5ahtIqZ1BgaAYt5bgg63oqmn67V1fmJ08tx1LT6BbGkt1WQBv8aNgm3Z5ztLWC8MJiqgeFpyQFUOIkVCQ\",\"e\":\"AQAB\",\"alg\":\"PS256\"}"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON>
 }
-
