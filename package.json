@@ -1,8 +1,9 @@
 {
   "name": "rdfjs-di",
-  "version": "1.0.0",
-  "description": "Data Integrity used to secure an RDF Dataset",
-  "main": "index.js",
+  "version": "0.0.9",
+  "date": "2024-06-12",
+  "description": "Secure an RDF Dataset through VC's Data Integrity",
+  "main": "dist/index.js",
   "scripts": {
     "test": "./node_modules/.bin/ts-node testing/run/main.ts",
     "crkey": "./node_modules/.bin/ts-node testing/run/createKeys.ts",
@@ -13,7 +14,7 @@
     "type": "git",
     "url": "git+https://github.com/iherman/rdfjs-di.git"
   },
-  "author": "Ivan Herman",
+  "author": "Ivan Herman <ivan@w3.org> (https://www.w3.org/People/Ivan/)",
   "license": "W3C-20150513",
   "bugs": {
     "url": "https://github.com/iherman/rdfjs-di/issues"
@@ -23,12 +24,19 @@
     "RDF",
     "security"
   ],
+  "files": [
+    "LICENSE.md",
+    "README.md",
+    "dist/**/*"
+  ],
+  "engines": {
+    "node": ">21.0.0"
+  },
   "dependencies": {
     "@rdfjs/types": "^1.1.0",
     "@truestamp/canonify": "^2.1.0",
     "base58-universal": "^2.0.0",
     "base64url": "^3.0.1",
-    "elliptic": "^6.5.5",
     "n3": "^1.17.2",
     "rdfjs-c14n": "^3.1.0",
     "uuid": "^9.0.1"

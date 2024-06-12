@@ -8,7 +8,7 @@ import { Cryptosuites }                 from '../../lib/types';
 import { keyToMultikey, multikeyToKey } from '../../lib/multikey';
 
 
-async function generateKey(suite: Cryptosuites, keyData?: KeyDetails): Promise<CryptoKey> {
+async function generateKey(suite: Cryptosuites, keyData?: KeyDetails): Promise<CryptoKeyPair> {
     const suiteToAPI = (): any => {
         switch (suite) {
             case Cryptosuites.ecdsa: return {
@@ -33,22 +33,39 @@ async function generateKey(suite: Cryptosuites, keyData?: KeyDetails): Promise<C
          }
     };
 
-    const newPair = await crypto.subtle.generateKey(suiteToAPI(), true, ["sign", "verify"]);
-    return newPair.publicKey;
+    return await crypto.subtle.generateKey(suiteToAPI(), true, ["sign", "verify"]);
+    // return newPair.publicKey;
 }
 
 (async () => {
-    // const key = await generateKey(Cryptosuites.ecdsa, {namedCurve: "P-384"});
+
+    const key = await generateKey(Cryptosuites.eddsa);
+
+    const v = {
+        "public": await crypto.subtle.exportKey('jwk', key.publicKey),
+        "private": await crypto.subtle.exportKey('jwk', key.privateKey),
+        "controller": "https://www.ivan-herman.net/foaf#me",
+        "cryptosuite": "ecdsa-rdfc-2022",
+        "expires": "2055-02-24T00:00",
+    };
+
+    console.log(JSON.stringify(v,null,4));
+
+
+
+
     // const { cryptosuite, multikey } = await keyToMultikey(key);
-    // console.log(await crypto.subtle.exportKey('jwk', key))
+    // console.log(await crypto.subtle.exportKey('jwk', key.privateKey))
+    // console.log(await crypto.subtle.exportKey('jwk', key.publicKey))
+
     // console.log(`suite: ${cryptosuite}; key: ${multikey}`);
 
-    // const convertedKey = await multikeyToKey(multikey);
+    // // const convertedKey = await multikeyToKey(multikey);
     // console.log(await crypto.subtle.exportKey('jwk', convertedKey))
 
 
     // const eddsa = await generateKey(Cryptosuites.eddsa);
-    const rsa_pss: CryptoKey = await generateKey(Cryptosuites.rsa_pss);
-    const rsa_raw = await crypto.subtle.exportKey('raw',rsa_pss);
+    // const rsa_pss: CryptoKey = await generateKey(Cryptosuites.rsa_pss);
+    // const rsa_raw = await crypto.subtle.exportKey('raw',rsa_pss);
     // const rsa_ssa = await generateKey(Cryptosuites.rsa_ssa);
 })();
