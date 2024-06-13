@@ -136,7 +136,7 @@ async function generateAProofGraph(report, hashValue, keyData) {
     const proofOptionHashValue = await calculateProofOptionsHash(proofGraph);
     // This is the extra trick in the cryptosuite specifications: the signature is upon the 
     // concatenation of the original dataset's hash and the hash of the proof option graph.
-    const signature = await (0, crypto_utils_1.sign)(report, hashValue + proofOptionHashValue, keyData.private);
+    const signature = await (0, crypto_utils_1.sign)(report, proofOptionHashValue + hashValue, keyData.private);
     // Close up...
     if (signature === null) {
         // An error has occurred during signature; details are in the report.
@@ -302,7 +302,7 @@ async function verifyAProofGraph(report, hash, proof, proofId) {
     if (publicKey !== null && proofValue !== null) {
         // First the proof option graph must be created and then hashed
         const proofOptionGraphHash = await calculateProofOptionsHash(proof);
-        const check_results = await (0, crypto_utils_1.verify)(report, hash + proofOptionGraphHash, proofValue, publicKey);
+        const check_results = await (0, crypto_utils_1.verify)(report, proofOptionGraphHash + hash, proofValue, publicKey);
         // the return value should nevertheless be false if there have been errors
         return check_results ? localErrors.length === 0 : true;
     }
