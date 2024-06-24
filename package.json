@@ -1,7 +1,7 @@
 {
   "name": "rdfjs-di",
-  "version": "0.0.9",
-  "date": "2024-06-12",
+  "version": "0.0.95",
+  "date": "2024-06-25",
   "description": "Secure an RDF Dataset through VC's Data Integrity",
   "main": "dist/index.js",
   "scripts": {

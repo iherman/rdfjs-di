@@ -48,6 +48,7 @@ export const sec_expires: rdf.NamedNode              = sec_prefix('expires');
 export const sec_revoked: rdf.NamedNode              = sec_prefix('revoked');
 export const sec_created: rdf.NamedNode              = sec_prefix('created');
 export const xsd_datetime: rdf.NamedNode             = xsd_prefix('dateTime');
+export const sec_previousProof: rdf.NamedNode        = sec_prefix("previousProof");
 
 
 /**
