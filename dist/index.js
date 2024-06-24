@@ -120,7 +120,7 @@ async function embedProofGraph(dataset, keyData, anchor) {
     // Adding the chain statements, if required
     if (isKeyChain) {
         for (let i = 1; i < chain.length; i++) {
-            const q = quad(chain[i].proofId, (0, proof_utils_1.sec_prefix)("previousProof"), chain[i - 1].proofId, chain[i].graph);
+            const q = quad(chain[i].proofId, proof_utils_1.sec_previousProof, chain[i - 1].proofId, chain[i].graph);
             retval.add(q);
         }
     }
@@ -180,6 +180,11 @@ async function verifyEmbeddedProofGraph(dataset, anchor) {
         if (q.predicate.equals(proof_utils_1.sec_proof) && proofGraphs.has(q.graph)) {
             // this is an extra entry, not part of the triples that were signed
             // neither it is part of any proof graphs
+            continue;
+        }
+        else if (q.predicate.equals(proof_utils_1.sec_previousProof)) {
+            // Per the cryptosuite specifications, the "previous proof" statement is not part of the "proof options", ie,
+            // should not be used for the generation of the final proof. It was not used to generate the proof graph when signing.
             continue;
         }
         else if (q.graph.termType === "DefaultGraph") {

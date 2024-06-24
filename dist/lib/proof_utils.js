@@ -10,7 +10,7 @@
  * @packageDocumentation
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyProofGraphs = exports.generateAProofGraph = exports.xsd_datetime = exports.sec_created = exports.sec_revoked = exports.sec_expires = exports.sec_verificationMethod = exports.sec_assertionMethod = exports.sec_authenticationMethod = exports.sec_proofPurpose = exports.sec_publicKeyMultibase = exports.sec_publicKeyJwk = exports.sec_proofValue = exports.sec_di_proof = exports.sec_proof = exports.rdf_json = exports.rdf_type = exports.xsd_prefix = exports.rdf_prefix = exports.sec_prefix = void 0;
+exports.verifyProofGraphs = exports.generateAProofGraph = exports.sec_previousProof = exports.xsd_datetime = exports.sec_created = exports.sec_revoked = exports.sec_expires = exports.sec_verificationMethod = exports.sec_assertionMethod = exports.sec_authenticationMethod = exports.sec_proofPurpose = exports.sec_publicKeyMultibase = exports.sec_publicKeyJwk = exports.sec_proofValue = exports.sec_di_proof = exports.sec_proof = exports.rdf_json = exports.rdf_type = exports.xsd_prefix = exports.rdf_prefix = exports.sec_prefix = void 0;
 const n3 = require("n3");
 const uuid_1 = require("uuid");
 const canonify_1 = require("@truestamp/canonify");
@@ -42,6 +42,7 @@ exports.sec_expires = (0, exports.sec_prefix)('expires');
 exports.sec_revoked = (0, exports.sec_prefix)('revoked');
 exports.sec_created = (0, exports.sec_prefix)('created');
 exports.xsd_datetime = (0, exports.xsd_prefix)('dateTime');
+exports.sec_previousProof = (0, exports.sec_prefix)("previousProof");
 /**
  * The proof option graph is the collection of all quads in a proof graph, except the proof
  * value. The hash of this graph is combined with the hash of the original data.

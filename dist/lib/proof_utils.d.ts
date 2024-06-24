@@ -32,6 +32,7 @@ export declare const sec_expires: rdf.NamedNode;
 export declare const sec_revoked: rdf.NamedNode;
 export declare const sec_created: rdf.NamedNode;
 export declare const xsd_datetime: rdf.NamedNode;
+export declare const sec_previousProof: rdf.NamedNode;
 /**
  * Generate a (separate) proof graph, per the DI spec. The signature is stored in
  * [multibase format](https://www.w3.org/TR/vc-data-integrity/#multibase-0), using base64url encoding.
