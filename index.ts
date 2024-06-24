@@ -13,7 +13,14 @@ import * as types        from './lib/types';
 
 import { Errors, KeyData, VerificationResult, Cryptosuites } from './lib/types';
 import { isKeyData, isDatasetCore, convertToStore, DatasetMap, GraphWithID, calculateDatasetHash } from './lib/utils';
-import { generateAProofGraph, verifyProofGraphs, rdf_type, sec_di_proof, sec_proof, sec_prefix }   from './lib/proof_utils';
+import { 
+    generateAProofGraph, verifyProofGraphs, 
+    rdf_type, 
+    sec_di_proof, 
+    sec_proof, 
+    sec_prefix, 
+    sec_previousProof 
+}   from './lib/proof_utils';
 
 /* This file is also the "top level", so a number of exports are put here to be more friendly to users */
 export type { KeyData, VerificationResult, KeyMetadata } from './lib/types';
@@ -144,7 +151,7 @@ export async function embedProofGraph(dataset: rdf.DatasetCore, keyData: KeyData
     // Adding the chain statements, if required
     if (isKeyChain) {
         for (let i = 1; i < chain.length; i++) {
-            const q = quad(chain[i].proofId, sec_prefix("previousProof"), chain[i - 1].proofId, chain[i].graph);
+            const q = quad(chain[i].proofId, sec_previousProof, chain[i - 1].proofId, chain[i].graph);
             retval.add(q);
         }
     }
@@ -205,6 +212,10 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
         if (q.predicate.equals(sec_proof) && proofGraphs.has(q.graph)) {
             // this is an extra entry, not part of the triples that were signed
             // neither it is part of any proof graphs
+            continue;
+        } else if(q.predicate.equals(sec_previousProof)) {
+            // Per the cryptosuite specifications, the "previous proof" statement is not part of the "proof options", ie,
+            // should not be used for the generation of the final proof. It was not used to generate the proof graph when signing.
             continue;
         } else if(q.graph.termType === "DefaultGraph") {
             dataStore.add(q)
