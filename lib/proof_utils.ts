@@ -17,7 +17,7 @@ import { canonify }   from '@truestamp/canonify';
 
 import * as types                                          from './types';
 import { Errors, KeyData }                                 from './types';
-import { createPrefix, GraphWithID, calculateDatasetHash } from './utils';
+import { createPrefix, ProofStore, calculateDatasetHash } from './utils';
 import { sign, verify, cryptosuiteId, algorithmData }      from './crypto_utils';
 import { multikeyToKey, keyToMultikey }                    from './multikey';
 
@@ -90,9 +90,10 @@ async function calculateProofOptionsHash(proofGraph: rdf.DatasetCore): Promise<s
  * @param report - placeholder for error reports
  * @param hashValue - this is the value of the Dataset's canonical hash 
  * @param keyData 
+ * @param previousProof - reference to a previous proof, if applicable
  * @returns 
  */
-export async function generateAProofGraph(report: Errors, hashValue: string, keyData: KeyData): Promise <rdf.DatasetCore> {
+export async function generateAProofGraph(report: Errors, hashValue: string, keyData: KeyData, previousProof ?: rdf.Quad_Subject): Promise <rdf.DatasetCore> {
     const cryptosuite = keyData?.cryptosuite || cryptosuiteId(report, keyData)
 
     // Generate the key data to be stored in the proof graph; either multikey or jwk, depending on the cryptosuite
@@ -123,9 +124,7 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
 
         // Unique URL-s, for the time being as uuid-s
         const proofGraphResource = namedNode(`urn:uuid:${uuid()}`);
-
-        const verificationMethodId = `urn:uuid:${uuid()}`;
-        const keyResource = namedNode(verificationMethodId);
+        const keyResource        = namedNode(`urn:uuid:${uuid()}`);
 
         // Create the resource for the proof graph itself, referring to a separate key resource
         proofGraph.addQuads([
@@ -145,6 +144,8 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
                 proofGraphResource, sec_proofPurpose, sec_assertionMethod
             )
         ]);
+
+        if (previousProof !== undefined) proofGraph.add(quad(proofGraphResource, sec_previousProof, previousProof));
 
         // Create the separate key resource triples (within the same graph)
         if (keyData.controller) proofGraph.add(quad(keyResource, sec_prefix('controller'), namedNode(keyData.controller)));
@@ -203,10 +204,10 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
         // Retrieve the signature value per spec:
         const proof_values: rdf.Quad[] = store.getQuads(null, sec_proofValue, null, null);
         if (proof_values.length === 0) {
-            localErrors.push(new types.Malformed_Proof_Error("No proof value"));
+            localErrors.push(new types.Proof_Verification_Error("No proof value"));
             return null;
         } else if (proof_values.length > 1) {
-            localErrors.push(new types.Malformed_Proof_Error("Several proof values"));
+            localErrors.push(new types.Proof_Verification_Error("Several proof values"));
         }
         return proof_values[0].object.value;
     };
@@ -215,10 +216,10 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
         // first see if the verificationMethod has been set properly
         const verificationMethod: rdf.Quad[] = store.getQuads(null, sec_verificationMethod, null, null);
         if (verificationMethod.length === 0) {
-            localErrors.push(new types.Malformed_Proof_Error("No verification method"));
+            localErrors.push(new types.Proof_Verification_Error("No verification method"));
             return null;
         } else if (verificationMethod.length > 1) {
-            localErrors.push(new types.Malformed_Proof_Error("Several verification methods"));
+            localErrors.push(new types.Proof_Verification_Error("Several verification methods"));
         }
 
         const publicKey = verificationMethod[0].object;
@@ -254,7 +255,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
 
         // Both arrays cannot exist at the same time!
         if (keys_jwk.length > 0 && keys_multikey.length > 0) {
-            localWarnings.push(new types.Malformed_Proof_Error(`JWK or Multikey formats can be used, but not both.`));
+            localWarnings.push(new types.Proof_Verification_Error(`JWK or Multikey formats can be used, but not both.`));
             return null;
         } else if (keys_jwk.length === 0) {
             // Trying Multikey, JWK is not used...
@@ -266,7 +267,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
                     const key: CryptoKey = await multikeyToKey(keys_multikey[0].object.value);
                     return crypto.subtle.exportKey('jwk', key);
                 } catch(e) {
-                    localWarnings.push(new types.Malformed_Proof_Error(`Parsing error for Multikey: ${e.message}`));
+                    localWarnings.push(new types.Proof_Verification_Error(`Parsing error for Multikey: ${e.message}`));
                     return null;
                 }
             } else {
@@ -279,7 +280,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
                 return JSON.parse(keys_jwk[0].object.value) as JsonWebKey;
             } catch (e) {
                 // This happens if there is a JSON parse error with the key...
-                localWarnings.push(new types.Malformed_Proof_Error(`Parsing error for JWK: ${e.message}`));
+                localWarnings.push(new types.Proof_Verification_Error(`Parsing error for JWK: ${e.message}`));
                 return null;
             }
         } else {
@@ -302,7 +303,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
                 }
             }
             if (wrongPurposes.length > 0) {
-                localErrors.push(new types.Mismatched_Proof_Purpose(`Invalid proof purpose value(s): ${wrongPurposes.join(", ")}`));
+                localErrors.push(new types.Proof_Transformation_Error(`Invalid proof purpose value(s): ${wrongPurposes.join(", ")}`));
             }
         }
     }
@@ -356,13 +357,13 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
  * @param proofs 
  * @returns 
  */
-export async function verifyProofGraphs(report: Errors, hash: string, proofs: GraphWithID[]): Promise<boolean> {
+export async function verifyProofGraphs(report: Errors, hash: string, proofs: ProofStore[]): Promise<boolean> {
     const allErrors: Errors[] = [];
     // deno-lint-ignore require-await
-    const singleVerification = async (pr: GraphWithID): Promise<boolean> => {
+    const singleVerification = async (pr: ProofStore): Promise<boolean> => {
         const singleReport: Errors = { errors: [], warnings: [] }
         allErrors.push(singleReport);
-        return verifyAProofGraph(singleReport, hash, pr.dataset, pr.id);
+        return verifyAProofGraph(singleReport, hash, pr.proofQuads, pr.proofGraph);
     }
 
     const promises: Promise<boolean>[] = proofs.map(singleVerification);

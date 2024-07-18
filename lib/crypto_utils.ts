@@ -234,7 +234,7 @@ export async function sign(report: Errors, message: string, secretKey: JsonWebKe
 export async function verify(report: Errors, message: string, signature: string, publicKey: JsonWebKey): Promise<boolean> {
     const rawMessage: ArrayBuffer = textToArrayBuffer(message);
     if (signature.length === 0 || signature[0] !== 'u') {
-        report.errors.push(new types.Malformed_Proof_Error(`Signature is of an incorrect format (${signature})`));
+        report.errors.push(new types.Proof_Verification_Error(`Signature is of an incorrect format (${signature})`));
         return false;
     }
     const rawSignature: ArrayBuffer = base64UrlToArrayBuffer(signature.slice(1));

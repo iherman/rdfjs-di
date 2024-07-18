@@ -12,14 +12,18 @@ import * as n3           from 'n3';
 import * as types        from './lib/types';
 
 import { Errors, KeyData, VerificationResult, Cryptosuites } from './lib/types';
-import { isKeyData, isDatasetCore, convertToStore, DatasetMap, GraphWithID, calculateDatasetHash } from './lib/utils';
 import { 
-    generateAProofGraph, verifyProofGraphs, 
+    isKeyData, 
+    isDatasetCore, convertToStore, copyToStore, refactorBnodes, 
+    DatasetMap, Proof, ProofStore, calculateDatasetHash 
+} from './lib/utils';
+import { 
+    generateAProofGraph, verifyProofGraphs,
     rdf_type, 
     sec_di_proof, 
     sec_proof, 
     sec_prefix, 
-    sec_previousProof 
+    sec_previousProof
 }   from './lib/proof_utils';
 
 /* This file is also the "top level", so a number of exports are put here to be more friendly to users */
@@ -35,14 +39,17 @@ const { quad } = n3.DataFactory;
  * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in 
  * multibase format, using base64url encoding. Keys are accepted in JWK format (and stored in JWK or in Multikey, depending on the crypto key).
  * 
+ * A single previous proof reference may also be set, although that really makes sense in the case of a single key only
+ * 
  * @param dataset 
  * @param keyData 
+ * @param previousProof - A previous proof ID, when applicable
  * @throws - Error if there was an issue while signing.
  * @returns 
  */
-export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: Iterable<KeyData>): Promise<rdf.DatasetCore[]>;
-export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyData): Promise<rdf.DatasetCore>;
-export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyData | Iterable<KeyData>): Promise<rdf.DatasetCore | rdf.DatasetCore[]> {
+export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: Iterable<KeyData>, previous?: rdf.Quad_Subject): Promise<rdf.DatasetCore[]>;
+export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyData, previous ?: rdf.Quad_Subject): Promise<rdf.DatasetCore>;
+export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyData | Iterable<KeyData>, previous?: rdf.Quad_Subject): Promise<rdf.DatasetCore | rdf.DatasetCore[]> {
     // Start fresh with results
     const report: Errors = { errors : [], warnings : [] }
 
@@ -51,7 +58,7 @@ export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyD
     // prepare for the overload of arguments
     const keyPairs: Iterable<KeyData> = isKeyData(keyData) ? [keyData] : keyData;
     // execute the proof graph generation concurrently
-    const promises: Promise<rdf.DatasetCore>[] = Array.from(keyPairs).map((keypair: KeyData) => generateAProofGraph(report, toBeSigned, keypair));
+    const promises: Promise<rdf.DatasetCore>[] = Array.from(keyPairs).map((keypair: KeyData) => generateAProofGraph(report, toBeSigned, keypair, previous));
     const retval: rdf.DatasetCore[] = await Promise.all(promises);
     // return by taking care of overloading.
     if (report.errors.length !== 0) {
@@ -88,10 +95,10 @@ export async function verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf
     const report: Errors = { errors: [], warnings: [] }    
     const hash: string = await calculateDatasetHash(dataset);
     const proofGraphs: rdf.DatasetCore[] = isDatasetCore(proofGraph) ? [proofGraph] : proofGraph;
-    const proofs = proofGraphs.map((pr: rdf.DatasetCore): GraphWithID => {
+    const proofs = proofGraphs.map((pr: rdf.DatasetCore): ProofStore => {
         return {
-            dataset: convertToStore(pr),
-            id: undefined,
+            proofQuads: convertToStore(pr),
+            proofGraph: undefined,
         };
     });
     const verified: boolean = await verifyProofGraphs(report, hash, proofs);
@@ -110,8 +117,9 @@ export async function verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf
  * 
  * If the anchor is defined, then that will be the subject for quads with the `proof` property is added (one for each proof graph). 
  * 
- * If the `keyPair` argument is an Array, then the proof graphs are considered to be a Proof Chain. Otherwise,
- * (e.g., if it is a Set), it is a Proof Set.
+ * If the `keyPair` argument is an Array, then the proof graphs are considered to define a Proof Chain. Otherwise,
+ * (e.g., if it is a Set), it is a Proof Set. Note that, per current spec, the anchor must exist to create a proper
+ * chain per spec, because the spec requires it to sign over the previous proof reference.
  * 
  * @param dataset 
  * @param keyData
@@ -119,43 +127,83 @@ export async function verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf
  * @returns 
  */
 export async function embedProofGraph(dataset: rdf.DatasetCore, keyData: KeyData | Iterable<KeyData>, anchor?: rdf.Quad_Subject): Promise<rdf.DatasetCore> {
-    const retval: n3.Store = convertToStore(dataset);
-
+    const output: n3.Store = convertToStore(dataset);
     const keyPairs: KeyData[] = isKeyData(keyData) ? [keyData] : Array.from(keyData);
 
-    const proofGraphs: rdf.DatasetCore[] = await generateProofGraph(dataset, keyPairs);
-
+    // Essential: in this API, an array is automatically a key chain, otherwise a key set.
+    // The peculiarity of the key chain embedding is that it requires the anchor to follow the official algorithm...
     const isKeyChain: boolean = keyPairs.length > 1 && Array.isArray(keyData);
-    const chain: { graph: rdf.BlankNode, proofId: rdf.Quad_Subject }[] = [];
 
-    for (let i = 0; i < proofGraphs.length; i++) {
-        const proofTriples = proofGraphs[i];
-        const proofGraphID = retval.createBlankNode();
+    // Convert a proof graph, generated by the appropriate method, into a proof chain entry;
+    // it extracts the data necessary to combine several proofs into what is necessary.
+    const storeProofData = (proofTriples: rdf.DatasetCore): Proof | null => {
+        // Look for the type statement among the graph entries
         for (const q of proofTriples) {
-            retval.add(quad(q.subject, q.predicate, q.object, proofGraphID));
-            if (isKeyChain && q.predicate.value === rdf_type.value && q.object.value === sec_di_proof.value) {
-                // Storing the values to create the proof chains in a subsequent step
-                // The subject is the ID of the proof
-                chain.push ({
-                    proofId: q.subject,
-                    graph : proofGraphID,
-                });
+            if (q.predicate.value === rdf_type.value && q.object.value === sec_di_proof.value) {
+                return {
+                    proofId    : q.subject,
+                    proofGraph : output.createBlankNode(),
+                    // proofQuads: refactorBnodes(retval, proofTriples), // refactoring may not be necessary here, because the proof graph does not contain bnodes...
+                    proofQuads :  proofTriples,
+                };
             }
-        };
-        if (anchor) {
-            const q = quad(anchor, sec_proof, proofGraphID);
-            retval.add(q);
+        } 
+        // This, in fact, does not happen. The proofTriples are generated by a function that does add a type triple...
+        // Returning null is just a way of making the TS compiler happy
+        return null;
+    };
+    let allProofs: Proof[] = [];
+
+
+    // Unfortunately, the key chain and key set cases are fairly different
+    if (isKeyChain) {
+        for (let i = 0; i < keyPairs.length; i++) {
+            const extraQuads: rdf.Quad[] = ((): rdf.Quad[] => {
+                const output: rdf.Quad[] = [];
+                if (i !== 0) {
+                    // if there is an anchor, then the intermediate store gets an extra triple
+                    const previousProof = allProofs[i - 1];
+
+                    if (anchor) output.push(quad(anchor, sec_proof, previousProof.proofGraph as rdf.Quad_Object));
+
+                    for (const q of previousProof.proofQuads) output.push(q)
+                }
+                return output;
+            })();
+
+            // These are the intermediate quads added to the dataset to secure the chain
+            for (const q of extraQuads) { output.add(q)}
+
+            // We generate the relevant proof graph
+            const proofTriples: rdf.DatasetCore = await generateProofGraph(output, keyPairs[i], i !== 0 ? allProofs[i - 1].proofId : undefined );
+
+            // Before we forget, we remove the intermediate quads
+            for (const q of extraQuads) { output.delete(q); }
+
+            const newProof: Proof = storeProofData(proofTriples);
+
+            if (newProof !== null) {
+                 allProofs.push(newProof);
+            }
         }
+    } else {
+        // This is the key set case
+        // All graphs could be generated in one blow...
+        const proofGraphs: rdf.DatasetCore[] = await generateProofGraph(dataset, keyPairs);
+        allProofs = proofGraphs.map(storeProofData);
     }
 
-    // Adding the chain statements, if required
-    if (isKeyChain) {
-        for (let i = 1; i < chain.length; i++) {
-            const q = quad(chain[i].proofId, sec_previousProof, chain[i - 1].proofId, chain[i].graph);
-            retval.add(q);
+    // Merge all generated proof datasets into the result
+    for (const proof of allProofs) {
+        if (anchor) {
+            output.add(quad(anchor, sec_proof, proof.proofGraph as rdf.Quad_Object))
+        }
+        for (const q of proof.proofQuads) {
+            // No need bnode reconciliation, because proof graphs never contain bnodes
+            output.add(quad(q.subject, q.predicate, q.object, proof.proofGraph)); 
         }
     }
-    return retval;
+    return output;
 }
 
 /**
@@ -184,8 +232,10 @@ export async function embedProofGraph(dataset: rdf.DatasetCore, keyData: KeyData
  * @returns 
 */
 export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?: rdf.Quad_Subject): Promise<VerificationResult> {
+    const report: Errors = { errors: [], warnings: [] };
     const dataStore   = new n3.Store();
     const proofGraphs = new DatasetMap();
+    let isProofChain: boolean = false;
 
     // First, identify the possible dataset graph IDs
     for (const q of dataset) {
@@ -193,7 +243,7 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
         if (anchor) {
             if (q.predicate.equals(sec_proof) && q.subject.equals(anchor)) {
                 if (q.object.termType !== "Literal") {
-                    proofGraphs.item(q.object as rdf.Quad_Graph);
+                    proofGraphs.set(q.object as rdf.Quad_Graph);
                 }               
             } 
         } else {
@@ -201,7 +251,11 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
             // This branch is the reason we have to use a DatasetMap for the 
             // storage of graph IDs; we should not have duplicate entries.
             if (q.predicate.equals(rdf_type) && q.object.equals(sec_di_proof)) {
-                proofGraphs.item(q.graph);
+                if (q.graph.termType === "DefaultGraph") {
+                    report.errors.push(new types.Proof_Verification_Error("Proof type in the default graph"))
+                } else {
+                    proofGraphs.set(q.graph);
+                }
             }
         }
     }
@@ -213,26 +267,34 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
             // this is an extra entry, not part of the triples that were signed
             // neither it is part of any proof graphs
             continue;
-        } else if(q.predicate.equals(sec_previousProof)) {
-            // Per the cryptosuite specifications, the "previous proof" statement is not part of the "proof options", ie,
-            // should not be used for the generation of the final proof. It was not used to generate the proof graph when signing.
-            continue;
         } else if(q.graph.termType === "DefaultGraph") {
             dataStore.add(q)
         } else if(proofGraphs.has(q.graph)) {
             // this quad belongs to a proof graph!
             // Note that the separated proof graphs contain only triples, they become
-            // stand-alone RDF graphs now
-            proofGraphs.item(q.graph).add(quad(q.subject, q.predicate, q.object));
+            // stand-alone RDF graphs now, not part of a dataset
+            const proofStore: ProofStore = proofGraphs?.get(q.graph);
+
+            // let us store the data itself first:
+            proofStore.proofQuads.add(quad(q.subject, q.predicate, q.object));
+
+            // see if this triple gives us the proof object ID;
+            if (q.predicate.equals(rdf_type) && q.object.equals(sec_di_proof)) {
+                proofStore.proofId = q.subject;
+            // see if we have a previous proof statement
+            } else if (q.predicate.equals(sec_previousProof) && q.object.termType !== "Literal") {
+                proofStore.previousProof = q.object;
+                // marking the whole thing a chain!
+                isProofChain = true;
+            }
         } else {
             // This a bona fide data quad, to be stored as such
             dataStore.add(q);
         }
     }
 
-    const report: Errors = { errors: [], warnings: [] };
     const hash: string = await calculateDatasetHash(dataStore);
-    const proofs: GraphWithID[] = proofGraphs.data(); 
+    const proofs: ProofStore[] = proofGraphs.data(); 
     const verified: boolean = await verifyProofGraphs(report, hash, proofs);
     return {
         verified,

@@ -14,7 +14,8 @@ import { RDFC10 } from 'rdfjs-c14n';
 import * as rdf   from '@rdfjs/types';
 import * as n3    from 'n3';
 import { KeyPair, KeyMetadata } from './types';
-const { namedNode } = n3.DataFactory;
+import { BNodeId } from '../.Attic/lib/types_utils';
+const { namedNode, quad } = n3.DataFactory;
 
 /***************************************************************************************
  * Namespace handling
@@ -58,12 +59,29 @@ export function createPrefix(uri: string): (l: string) => rdf.NamedNode {
  * Needed to separate the proof graphs from the "real" data
  **************************************************************************************/
 
+export interface Proof {
+    /** 
+     * A collection of statements for a proof is to be in its own graph, generally with a blank node.
+     * 
+     * Note that the type restriction for this term is `Quad_Subject`, which stands for a term or a blank node, which is
+     * more restrictive than a `Quad_Graph`, which may also have the value of a default graph. But proofs are always
+     * a real graph...
+     */
+    proofGraph : rdf.Quad_Graph, 
+
+    /** The proof ID, which, in this implementation, is never a blank node, usually a UUID */
+    proofId ?:   rdf.Quad_Subject,   
+
+    /** The proof statements themselves, a set of triples (not quads) */
+    proofQuads : rdf.DatasetCore,   
+}
+
 /**
- * Structure with a separate store and its ID as a graph
+ * The general structure for a Proof using n3.Store specifically.
  */
-export interface GraphWithID {
-    id:       rdf.Quad_Graph | undefined,
-    dataset : n3.Store;
+export interface ProofStore extends Proof {
+    proofQuads : n3.Store,
+    previousProof ?: rdf.Quad_Subject,
 }
 
 /**
@@ -73,7 +91,7 @@ export interface GraphWithID {
  * the original term; that may become unnecessary on long term.)
  */
 export class DatasetMap {
-    private index: Map<string, GraphWithID>;
+    private index: Map<string, ProofStore>;
 
     constructor() {
         this.index = new Map();
@@ -83,23 +101,35 @@ export class DatasetMap {
      * Create a new dataset, if needed, otherwise returns the
      * dataset already stored.
      * 
+     * See the remark above for the graph value's type constraint: it is o.k. to use `Quad_Subject`, because it
+     * should never be a default graph.
+     * 
      * @param graph 
      * @returns 
      */
     item(graph: rdf.Quad_Graph): n3.Store {
+        const proofStore = this.get(graph);
+        return proofStore?.proofQuads;
+    }
+
+    get(graph: rdf.Quad_Graph): ProofStore | undefined {
         if (this.index.has(graph.value)) {
-            // The '?' operator is to make deno happy. By virtue of the 
-            // test we know that the value cannot be undefined, but
-            // the deno checker does not realize this...
-            return this.index.get(graph.value)?.dataset;
+            return this.index.get(graph.value);
         } else {
-            const dataset = new n3.Store();
-            this.index.set(graph.value, {
-                id: graph,
-                dataset
-            });
-            return dataset;
+            return undefined;
         }
+    }
+
+    set(graph: rdf.Quad_Graph): DatasetMap {
+        if (!this.index.has(graph.value)) {
+            const dataset = new n3.Store();
+            const proofStore: ProofStore = {
+                proofGraph: graph,
+                proofQuads: dataset,
+            };
+            this.index.set(graph.value, proofStore);
+        }
+        return this
     }
 
     has(graph: rdf.Term): boolean {
@@ -107,10 +137,10 @@ export class DatasetMap {
     }
 
     datasets(): n3.Store[] {
-        return Array.from(this.index.values()).map((entry) => entry.dataset);
+        return Array.from(this.index.values()).map((entry) => entry.proofQuads);
     }
 
-    data(): GraphWithID[] {
+    data(): ProofStore[] {
         return Array.from(this.index.values());
     }
 }
@@ -169,7 +199,7 @@ export async function calculateDatasetHash(dataset: rdf.DatasetCore): Promise<st
  * @param dataset 
  * @returns 
  */
-function copyToStore(dataset: rdf.DatasetCore): n3.Store {
+export function copyToStore(dataset: rdf.DatasetCore): n3.Store {
     const retval = new n3.Store();
     for (const q of dataset) retval.add(q);
     return retval;
@@ -184,4 +214,40 @@ function copyToStore(dataset: rdf.DatasetCore): n3.Store {
  */
 export function convertToStore(dataset: rdf.DatasetCore): n3.Store {
     return (dataset instanceof n3.Store) ? dataset : copyToStore(dataset);
+}
+
+/**
+ * "Refactor" BNodes in a dataset: bnodes are replaced by new one to avoid a clash with the base dataset.
+ * Extremely inefficient, but is used for very small graphs only (proof graphs), so efficiency is not really an issue.
+ * 
+ * The trick is to use the bnode generator of the base dataset, and that should make it unique...
+ * 
+ * @param base 
+ * @param toTransform
+ */
+export function refactorBnodes(base: n3.Store, toTransform: rdf.DatasetCore): rdf.DatasetCore {
+    type BNodeId = string;
+    const bNodeMapping: Map<BNodeId, rdf.BlankNode> = new Map();
+    const newTerm = (term: rdf.Quad_Subject | rdf.Quad_Object): rdf.Quad_Subject | rdf.Quad_Object => {
+        if (term.termType === "BlankNode") {
+            if (bNodeMapping.has(term.value)) {
+                return bNodeMapping.get(term.value);
+            } else {
+                const bnode = base.createBlankNode();
+                bNodeMapping.set(term.value, bnode);
+                return bnode;
+            }
+        } else {
+            return term;
+        }
+    }
+
+    const retval: n3.Store = new n3.Store();
+    for(const q of toTransform) {
+        let subject = newTerm(q.subject) as rdf.Quad_Subject;
+        let predicate = q.predicate;
+        let object = newTerm(q.object) as rdf.Quad_Object;
+        retval.add(quad(subject,predicate,object));
+    }
+    return retval;
 }
