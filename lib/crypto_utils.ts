@@ -248,6 +248,9 @@ export async function verify(report: Errors, message: string, signature: string,
         try {
             const key: CryptoKey = await crypto.subtle.importKey("jwk", publicKey, algorithm, true, ["verify"]);
             const retval: boolean = await crypto.subtle.verify(algorithm, key, rawSignature, rawMessage);
+            if (retval === false) {
+                report.errors.push(new types.Proof_Verification_Error(`Signature ${signature} is invalid`));
+            }
             return retval;
         } catch(e) {
             report.errors.push(new types.Proof_Generation_Error(e.message));

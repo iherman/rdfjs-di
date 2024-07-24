@@ -10,12 +10,11 @@
  * 
  */
 
-import { RDFC10 }                 from 'rdfjs-c14n';
-import * as rdf                   from '@rdfjs/types';
-import * as n3                    from 'n3';
-import { KeyPair, KeyMetadata }   from './types';
-import { rdf_type, sec_di_proof } from './proof_utils';
-import * as debug                 from './debug';
+import { RDFC10 }                            from 'rdfjs-c14n';
+import * as rdf                              from '@rdfjs/types';
+import * as n3                               from 'n3';
+import { KeyPair, KeyMetadata }              from './types';
+import * as debug                            from './debug';
 
 const { namedNode, quad } = n3.DataFactory;
 
@@ -323,4 +322,28 @@ export function refactorBnodes(base: n3.Store, toTransform: rdf.DatasetCore): rd
         retval.add(quad(subject,predicate,object));
     }
     return retval;
+}
+
+
+/**
+ * When handling proof chains, the dataset must be temporarily extended with a number of quads that
+ * constitute the "previous" proof. This function calculates those extra quads.
+ * 
+ * @param allProofs - the array of Proofs in chain order 
+ * @param index - current index into allProofs
+ * @param anchor - the possible anchor that includes the `proof` reference triple
+ * @returns 
+ */
+export function extraChainQuads(allProofs: Proof[], index: number, anchor?: rdf.Quad_Subject): rdf.Quad[] {
+    if (index !== 0) {
+        // if there is an anchor, then the intermediate store gets an extra triple
+        const previousProof = allProofs[index - 1];
+        const output: rdf.Quad[] = Array.from(previousProof.proofQuads).map((q:rdf.Quad): rdf.Quad => {
+            return quad(q.subject, q.predicate, q.object, previousProof.proofGraph);
+        });
+        if (anchor) output.push(quad(anchor, namedNode('https://w3id.org/security#proof'), previousProof.proofGraph as rdf.Quad_Object));
+        return output;
+    } else {
+        return [];
+    }
 }

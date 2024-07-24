@@ -13,7 +13,12 @@ const DEBUG: boolean = false;
 
 export function log(str: any, dataset?: rdf.DatasetCore): void {
     if(DEBUG) {
-        console.error('\x1b[33m%s\x1b[0m', str);
+        if (typeof str === 'string') {
+            console.error(str);
+        } else {
+            console.error(JSON.stringify(str, null, 4));
+        }
+
         if(dataset !== undefined) {
             console.error('\n')
             write_quads(dataset, console.error);

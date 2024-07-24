@@ -80,8 +80,8 @@ async function calculateProofOptionsHash(proofGraph: rdf.DatasetCore): Promise<s
     }
 
     // The return value must be the hash of the proof option graph
-    debug.log(`The proof graph to hash:`, proofOptions);
-    debug.log('\n');
+    // debug.log(`The proof graph to hash:`, proofOptions);
+    // debug.log('\n');
     return await calculateDatasetHash(proofOptions);
 }
 
