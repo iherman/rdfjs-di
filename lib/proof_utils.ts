@@ -20,6 +20,7 @@ import { Errors, KeyData }                                 from './types';
 import { createPrefix, ProofStore, calculateDatasetHash } from './utils';
 import { sign, verify, cryptosuiteId, algorithmData }      from './crypto_utils';
 import { multikeyToKey, keyToMultikey }                    from './multikey';
+import * as debug                                          from './debug';
 
 // n3.DataFactory is a namespace with some functions...
 const { namedNode, literal, quad } = n3.DataFactory;
@@ -79,9 +80,10 @@ async function calculateProofOptionsHash(proofGraph: rdf.DatasetCore): Promise<s
     }
 
     // The return value must be the hash of the proof option graph
-    return await calculateDatasetHash(proofGraph);
+    debug.log(`The proof graph to hash:`, proofOptions);
+    debug.log('\n');
+    return await calculateDatasetHash(proofOptions);
 }
-
 
 /**
  * Generate a (separate) proof graph, per the DI spec. The signature is stored in 
@@ -162,6 +164,10 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
 
     // This is the extra trick in the cryptosuite specifications: the signature is upon the 
     // concatenation of the original dataset's hash and the hash of the proof option graph.
+           
+    
+    /* @@@@@ */ debug.log(`Signing ${proofOptionHashValue} + ${hashValue}`)
+
     const signature = await sign(report, proofOptionHashValue + hashValue, keyData.private);
 
     // Close up...
@@ -329,9 +335,13 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
     if (publicKey !== null && proofValue !== null) {
         // First the proof option graph must be created and then hashed
         const proofOptionGraphHash = await calculateProofOptionsHash(proof);
-        const check_results = await verify(report, proofOptionGraphHash + hash, proofValue, publicKey)
+        /* @@@@@ */ debug.log(`Verifying ${proofOptionGraphHash} + ${hash}`)
+        const check_results = await verify(report, proofOptionGraphHash + hash, proofValue, publicKey);
+
         // the return value should nevertheless be false if there have been errors
-        return check_results ? localErrors.length === 0 : true;
+        const output = check_results ? localErrors.length === 0 : false;
+         /* @@@@@ */ debug.log(`verification result: ${output}`)
+        return output
     } else {
         return false;
     }

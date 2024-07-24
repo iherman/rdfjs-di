@@ -10,12 +10,13 @@
 import * as rdf          from '@rdfjs/types';
 import * as n3           from 'n3';
 import * as types        from './lib/types';
+import * as debug        from './lib/debug';
 
 import { Errors, KeyData, VerificationResult, Cryptosuites } from './lib/types';
 import { 
     isKeyData, 
     isDatasetCore, convertToStore, copyToStore, refactorBnodes, 
-    DatasetMap, Proof, ProofStore, calculateDatasetHash 
+    DatasetMap, Proof, ProofStore, calculateDatasetHash
 } from './lib/utils';
 import { 
     generateAProofGraph, verifyProofGraphs,
@@ -33,7 +34,7 @@ export { Cryptosuites}                                   from './lib/types';
 export { generateKey }                                   from './lib/crypto_utils';
 
 // n3.DataFactory is a namespace with some functions...
-const { quad } = n3.DataFactory;
+const { quad, namedNode } = n3.DataFactory;
 
 /**
  * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in 
@@ -55,6 +56,7 @@ export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyD
 
     // This is to be signed
     const toBeSigned = await calculateDatasetHash(dataset);
+
     // prepare for the overload of arguments
     const keyPairs: Iterable<KeyData> = isKeyData(keyData) ? [keyData] : keyData;
     // execute the proof graph generation concurrently
@@ -253,10 +255,10 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
         } else {
             // There is no anchor; we are looking for graphs whose type has been set
             // This branch is the reason we have to use a DatasetMap for the 
-            // storage of graph IDs; we should not have duplicate entries.
+            // storage of graph IDs: we should not have duplicate entries.
             if (q.predicate.equals(rdf_type) && q.object.equals(sec_di_proof)) {
                 if (q.graph.termType === "DefaultGraph") {
-                    report.errors.push(new types.Proof_Verification_Error("Proof type in the default graph"))
+                    report.errors.push(new types.Proof_Verification_Error("Proof type cannot be the default graph"))
                 } else {
                     proofGraphs.set(q.graph);
                 }
@@ -264,8 +266,8 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
         }
     }
 
-    // By now, we got the identification of all the proof graphs, we can separate the quads among 
-    // the data graph and the relevant proof graphs
+    // By now, we got the identification of all the proof graphs, we can separate the quads into 
+    // the "real" data graph and the relevant proof graphs
     for (const q of dataset) {
         if (q.predicate.equals(sec_proof) && proofGraphs.has(q.graph)) {
             // this is an extra entry, not part of the triples that were signed
@@ -274,8 +276,8 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
         } else if(q.graph.termType === "DefaultGraph") {
             dataStore.add(q)
         } else if(proofGraphs.has(q.graph)) {
-            // this quad belongs to a proof graph!
-            // Note that the separated proof graphs contain only triples, they become
+            // this quad belongs to one of the proof graphs!
+            // Note that the separated proof graphs should contain only as they become
             // stand-alone RDF graphs now, not part of a dataset
             const proofStore: ProofStore = proofGraphs?.get(q.graph);
 
@@ -285,7 +287,7 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
             // see if this triple gives us the proof object ID;
             if (q.predicate.equals(rdf_type) && q.object.equals(sec_di_proof)) {
                 proofStore.proofId = q.subject;
-            // see if we have a previous proof statement
+            // see if this is a previous proof statement; if so, store the reference for a subsequent ordering
             } else if (q.predicate.equals(sec_previousProof) && q.object.termType !== "Literal") {
                 proofStore.previousProof = q.object;
                 // marking the whole thing a chain!
@@ -297,14 +299,62 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
         }
     }
 
-    const hash: string = await calculateDatasetHash(dataStore);
-    const proofs: ProofStore[] = proofGraphs.data(); 
-    const verified: boolean = await verifyProofGraphs(report, hash, proofs);
-    return {
-        verified,
-        verifiedDocument: verified ? dataStore : null,
-        errors: report.errors,
-        warnings: report.warnings
+    if (isProofChain) {
+        // Get the proofs into a reference order, just like when it is submitted
+        const allProofs: ProofStore[] = proofGraphs.orderedData();
+        let verified: boolean;
+
+        if (allProofs.length === 0) {
+            report.errors.push(new types.Proof_Verification_Error("Proof Chain has no start."))
+            verified = false;
+        } else {
+            const verified_list: boolean[] = [];
+            for (let i = 0; i < allProofs.length; i++) {
+                const extraQuads: rdf.Quad[] = ((): rdf.Quad[] => {
+                    if (i !== 0) {
+                        // if there is an anchor, then the intermediate store gets an extra triple
+                        const previousProof = allProofs[i - 1];
+                        const output: rdf.Quad[] = Array.from(previousProof.proofQuads);
+                        if (anchor) output.push(quad(anchor, sec_proof, previousProof.proofGraph as rdf.Quad_Object));
+                        return output;
+                    } else {
+                        return [];
+                    }
+                })();
+
+                // These are the intermediate quads added to the dataset to secure the chain
+                // (This is an n3 specific API method!)
+                dataStore.addQuads(extraQuads);
+
+                // distorting the original datastore to check whether the invalidity is reported
+                // dataStore.addQuad(namedNode('https://www.ivan-herman.net'), namedNode('https://www.nami.van'), namedNode('http://www.ez.van'));
+
+                const hash: string = await calculateDatasetHash(dataStore);
+                const verifiedChainLink: boolean = await verifyProofGraphs(report, hash, [allProofs[i]]);
+                verified_list.push(verifiedChainLink);
+                dataStore.removeQuads(extraQuads);
+            }
+            verified = !verified_list.includes(false)
+        }
+
+        return {
+            verified,
+            verifiedDocument: verified ? dataStore : null,
+            errors: report.errors,
+            warnings: report.warnings
+        }
+    } else {
+        // This is the simple case...
+
+        const hash: string = await calculateDatasetHash(dataStore);
+        const proofs: ProofStore[] = proofGraphs.data();
+        const verified: boolean = await verifyProofGraphs(report, hash, proofs);
+        return {
+            verified,
+            verifiedDocument: verified ? dataStore : null,
+            errors: report.errors,
+            warnings: report.warnings
+        }
     }
 }
 

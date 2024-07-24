@@ -10,11 +10,13 @@
  * 
  */
 
-import { RDFC10 } from 'rdfjs-c14n';
-import * as rdf   from '@rdfjs/types';
-import * as n3    from 'n3';
-import { KeyPair, KeyMetadata } from './types';
-import { BNodeId } from '../.Attic/lib/types_utils';
+import { RDFC10 }                 from 'rdfjs-c14n';
+import * as rdf                   from '@rdfjs/types';
+import * as n3                    from 'n3';
+import { KeyPair, KeyMetadata }   from './types';
+import { rdf_type, sec_di_proof } from './proof_utils';
+import * as debug                 from './debug';
+
 const { namedNode, quad } = n3.DataFactory;
 
 /***************************************************************************************
@@ -59,13 +61,16 @@ export function createPrefix(uri: string): (l: string) => rdf.NamedNode {
  * Needed to separate the proof graphs from the "real" data
  **************************************************************************************/
 
+/**
+ * The general structure for a Proof
+ */
 export interface Proof {
     /** 
      * A collection of statements for a proof is to be in its own graph, generally with a blank node.
      * 
      * Note that the type restriction for this term is `Quad_Subject`, which stands for a term or a blank node, which is
      * more restrictive than a `Quad_Graph`, which may also have the value of a default graph. But proofs are always
-     * a real graph...
+     * real graphs.
      */
     proofGraph : rdf.Quad_Graph, 
 
@@ -77,7 +82,8 @@ export interface Proof {
 }
 
 /**
- * The general structure for a Proof using n3.Store specifically.
+ * The general structure for a Proof using n3.Store specifically; it also has a `perviousProof` key. 
+ * This subclass is used when key chains or sets are extracted from an embedded proof.
  */
 export interface ProofStore extends Proof {
     proofQuads : n3.Store,
@@ -112,6 +118,12 @@ export class DatasetMap {
         return proofStore?.proofQuads;
     }
 
+    /**
+     * Get a proof, or `undefined` if it has not been stored yet
+     * 
+     * @param graph 
+     * @returns - the proof store data
+     */
     get(graph: rdf.Quad_Graph): ProofStore | undefined {
         if (this.index.has(graph.value)) {
             return this.index.get(graph.value);
@@ -120,6 +132,12 @@ export class DatasetMap {
         }
     }
 
+    /**
+     * Set a proof
+     * 
+     * @param graph 
+     * @returns - the current dataset map
+     */
     set(graph: rdf.Quad_Graph): DatasetMap {
         if (!this.index.has(graph.value)) {
             const dataset = new n3.Store();
@@ -132,16 +150,71 @@ export class DatasetMap {
         return this
     }
 
+    /**
+     * Has a proof been stored with this graph reference/
+     * 
+     * @param graph 
+     * @returns 
+     */
     has(graph: rdf.Term): boolean {
         return this.index.has(graph.value);
     }
 
+    /**
+     * Get the dataset references (in no particular order)
+     * 
+     * @returns - the datasets
+     */
     datasets(): n3.Store[] {
         return Array.from(this.index.values()).map((entry) => entry.proofQuads);
     }
 
+    /**
+     * Get the proof entries (in no particular order)
+     * @returns - the proof entries
+     */
     data(): ProofStore[] {
         return Array.from(this.index.values());
+    }
+
+    /**
+     * Get the proof entries, following the order imposed by the `previousProof` statements. First element is the one that has no previous proof defined. If there are no nodes with previous proof, an empty array is returned.
+     * 
+     * This is equivalent to the way proof chains are passed on as arguments when embedded chains are created.
+     * 
+     * @returns - the proofs entries
+     */
+    orderedData(): ProofStore[] {
+        const stores: ProofStore[] = this.data();
+
+        // Look for the start of the chain
+        const start: ProofStore = ((): ProofStore => {
+            for (const proof of stores) {
+                if (proof.previousProof === undefined) {
+                    return proof;
+                }
+            }
+            return undefined;
+        })();
+
+        if (start === undefined) {
+            return [];
+        } else {
+            const output: ProofStore[] = [start];
+            let current = start;
+            nextInChain: for (; true;) {
+                for (const q of stores) {
+                    if (q.previousProof && q.previousProof.equals(current.proofId)) {
+                        output.push(q);
+                        current = q;
+                        continue nextInChain;
+                    }
+                }
+                // If we get there, we got to a proof that is never referred to as 'previous'
+                // which should be the end of the chain...
+                return output;
+            }
+        }    
     }
 }
 
