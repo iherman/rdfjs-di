@@ -11,10 +11,10 @@
  *
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.convertToStore = exports.calculateDatasetHash = exports.isKeyData = exports.isDatasetCore = exports.DatasetMap = exports.createPrefix = void 0;
+exports.extraChainQuads = exports.refactorBnodes = exports.convertToStore = exports.copyToStore = exports.calculateDatasetHash = exports.isKeyData = exports.isDatasetCore = exports.DatasetMap = exports.createPrefix = void 0;
 const rdfjs_c14n_1 = require("rdfjs-c14n");
 const n3 = require("n3");
-const { namedNode } = n3.DataFactory;
+const { namedNode, quad } = n3.DataFactory;
 /***************************************************************************************
  * Namespace handling
  **************************************************************************************/
@@ -67,33 +67,108 @@ class DatasetMap {
      * Create a new dataset, if needed, otherwise returns the
      * dataset already stored.
      *
+     * See the remark above for the graph value's type constraint: it is o.k. to use `Quad_Subject`, because it
+     * should never be a default graph.
+     *
      * @param graph
      * @returns
      */
     item(graph) {
+        const proofStore = this.get(graph);
+        return proofStore?.proofQuads;
+    }
+    /**
+     * Get a proof, or `undefined` if it has not been stored yet
+     *
+     * @param graph
+     * @returns - the proof store data
+     */
+    get(graph) {
         if (this.index.has(graph.value)) {
-            // The '?' operator is to make deno happy. By virtue of the 
-            // test we know that the value cannot be undefined, but
-            // the deno checker does not realize this...
-            return this.index.get(graph.value)?.dataset;
+            return this.index.get(graph.value);
         }
         else {
-            const dataset = new n3.Store();
-            this.index.set(graph.value, {
-                id: graph,
-                dataset
-            });
-            return dataset;
+            return undefined;
         }
     }
+    /**
+     * Set a proof
+     *
+     * @param graph
+     * @returns - the current dataset map
+     */
+    set(graph) {
+        if (!this.index.has(graph.value)) {
+            const dataset = new n3.Store();
+            const proofStore = {
+                proofGraph: graph,
+                proofQuads: dataset,
+            };
+            this.index.set(graph.value, proofStore);
+        }
+        return this;
+    }
+    /**
+     * Has a proof been stored with this graph reference/
+     *
+     * @param graph
+     * @returns
+     */
     has(graph) {
         return this.index.has(graph.value);
     }
+    /**
+     * Get the dataset references (in no particular order)
+     *
+     * @returns - the datasets
+     */
     datasets() {
-        return Array.from(this.index.values()).map((entry) => entry.dataset);
+        return Array.from(this.index.values()).map((entry) => entry.proofQuads);
     }
+    /**
+     * Get the proof entries (in no particular order)
+     * @returns - the proof entries
+     */
     data() {
         return Array.from(this.index.values());
+    }
+    /**
+     * Get the proof entries, following the order imposed by the `previousProof` statements. First element is the one that has no previous proof defined. If there are no nodes with previous proof, an empty array is returned.
+     *
+     * This is equivalent to the way proof chains are passed on as arguments when embedded chains are created.
+     *
+     * @returns - the proofs entries
+     */
+    orderedData() {
+        const stores = this.data();
+        // Look for the start of the chain
+        const start = (() => {
+            for (const proof of stores) {
+                if (proof.previousProof === undefined) {
+                    return proof;
+                }
+            }
+            return undefined;
+        })();
+        if (start === undefined) {
+            return [];
+        }
+        else {
+            const output = [start];
+            let current = start;
+            nextInChain: for (; true;) {
+                for (const q of stores) {
+                    if (q.previousProof && q.previousProof.equals(current.proofId)) {
+                        output.push(q);
+                        current = q;
+                        continue nextInChain;
+                    }
+                }
+                // If we get there, we got to a proof that is never referred to as 'previous'
+                // which should be the end of the chain...
+                return output;
+            }
+        }
     }
 }
 exports.DatasetMap = DatasetMap;
@@ -154,6 +229,7 @@ function copyToStore(dataset) {
         retval.add(q);
     return retval;
 }
+exports.copyToStore = copyToStore;
 /**
  * Convert the dataset into an n3.Store, unless it is already a store.
  * This is done to manage the various quads more efficiently.
@@ -165,3 +241,64 @@ function convertToStore(dataset) {
     return (dataset instanceof n3.Store) ? dataset : copyToStore(dataset);
 }
 exports.convertToStore = convertToStore;
+/**
+ * "Refactor" BNodes in a dataset: bnodes are replaced by new one to avoid a clash with the base dataset.
+ * Extremely inefficient, but is used for very small graphs only (proof graphs), so efficiency is not really an issue.
+ *
+ * The trick is to use the bnode generator of the base dataset, and that should make it unique...
+ *
+ * @param base
+ * @param toTransform
+ */
+function refactorBnodes(base, toTransform) {
+    const bNodeMapping = new Map();
+    const newTerm = (term) => {
+        if (term.termType === "BlankNode") {
+            if (bNodeMapping.has(term.value)) {
+                return bNodeMapping.get(term.value);
+            }
+            else {
+                const bnode = base.createBlankNode();
+                bNodeMapping.set(term.value, bnode);
+                return bnode;
+            }
+        }
+        else {
+            return term;
+        }
+    };
+    const retval = new n3.Store();
+    for (const q of toTransform) {
+        let subject = newTerm(q.subject);
+        let predicate = q.predicate;
+        let object = newTerm(q.object);
+        retval.add(quad(subject, predicate, object));
+    }
+    return retval;
+}
+exports.refactorBnodes = refactorBnodes;
+/**
+ * When handling proof chains, the dataset must be temporarily extended with a number of quads that
+ * constitute the "previous" proof. This function calculates those extra quads.
+ *
+ * @param allProofs - the array of Proofs in chain order
+ * @param index - current index into allProofs
+ * @param anchor - the possible anchor that includes the `proof` reference triple
+ * @returns
+ */
+function extraChainQuads(allProofs, index, anchor) {
+    if (index !== 0) {
+        // if there is an anchor, then the intermediate store gets an extra triple
+        const previousProof = allProofs[index - 1];
+        const output = Array.from(previousProof.proofQuads).map((q) => {
+            return quad(q.subject, q.predicate, q.object, previousProof.proofGraph);
+        });
+        if (anchor)
+            output.push(quad(anchor, namedNode('https://w3id.org/security#proof'), previousProof.proofGraph));
+        return output;
+    }
+    else {
+        return [];
+    }
+}
+exports.extraChainQuads = extraChainQuads;

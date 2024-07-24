@@ -10,7 +10,7 @@
  */
 import * as rdf from '@rdfjs/types';
 import { Errors, KeyData } from './types';
-import { GraphWithID } from './utils';
+import { ProofStore } from './utils';
 /***************************************************************************************
  * Namespaces and specific terms that are used several times
  **************************************************************************************/
@@ -40,9 +40,10 @@ export declare const sec_previousProof: rdf.NamedNode;
  * @param report - placeholder for error reports
  * @param hashValue - this is the value of the Dataset's canonical hash
  * @param keyData
+ * @param previousProof - reference to a previous proof, if applicable
  * @returns
  */
-export declare function generateAProofGraph(report: Errors, hashValue: string, keyData: KeyData): Promise<rdf.DatasetCore>;
+export declare function generateAProofGraph(report: Errors, hashValue: string, keyData: KeyData, previousProof?: rdf.Quad_Subject): Promise<rdf.DatasetCore>;
 /**
  *  Check a series of proof graphs, ie, check whether the included signature of a proof graph corresponds to the hash value.
  *
@@ -63,4 +64,4 @@ export declare function generateAProofGraph(report: Errors, hashValue: string, k
  * @param proofs
  * @returns
  */
-export declare function verifyProofGraphs(report: Errors, hash: string, proofs: GraphWithID[]): Promise<boolean>;
+export declare function verifyProofGraphs(report: Errors, hash: string, proofs: ProofStore[]): Promise<boolean>;

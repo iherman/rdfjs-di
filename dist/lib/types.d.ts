@@ -50,10 +50,10 @@ export interface Errors {
 export declare class Proof_Generation_Error extends ProblemDetail {
     constructor(detail: string);
 }
-export declare class Malformed_Proof_Error extends ProblemDetail {
+export declare class Proof_Verification_Error extends ProblemDetail {
     constructor(detail: string);
 }
-export declare class Mismatched_Proof_Purpose extends ProblemDetail {
+export declare class Proof_Transformation_Error extends ProblemDetail {
     constructor(detail: string);
 }
 export declare class Invalid_Verification_Method extends ProblemDetail {

@@ -44,7 +44,7 @@ const { quad, namedNode } = n3.DataFactory;
  * 
  * @param dataset 
  * @param keyData 
- * @param previousProof - A previous proof ID, when applicable
+ * @param previous - A previous proof ID, when applicable
  * @throws - Error if there was an issue while signing.
  * @returns 
  */

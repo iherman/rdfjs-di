@@ -5,7 +5,7 @@
  * @packageDocumentation
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Unclassified_Error = exports.Invalid_Verification_Method = exports.Mismatched_Proof_Purpose = exports.Malformed_Proof_Error = exports.Proof_Generation_Error = exports.ProblemDetail = exports.Cryptosuites = void 0;
+exports.Unclassified_Error = exports.Invalid_Verification_Method = exports.Proof_Transformation_Error = exports.Proof_Verification_Error = exports.Proof_Generation_Error = exports.ProblemDetail = exports.Cryptosuites = void 0;
 var Cryptosuites;
 (function (Cryptosuites) {
     Cryptosuites["ecdsa"] = "ecdsa-rdfc-2019";
@@ -43,18 +43,18 @@ class Proof_Generation_Error extends ProblemDetail {
     }
 }
 exports.Proof_Generation_Error = Proof_Generation_Error;
-class Malformed_Proof_Error extends ProblemDetail {
+class Proof_Verification_Error extends ProblemDetail {
     constructor(detail) {
-        super(detail, 'Malformed proof error', -17);
+        super(detail, 'Proof verification error', -17);
     }
 }
-exports.Malformed_Proof_Error = Malformed_Proof_Error;
-class Mismatched_Proof_Purpose extends ProblemDetail {
+exports.Proof_Verification_Error = Proof_Verification_Error;
+class Proof_Transformation_Error extends ProblemDetail {
     constructor(detail) {
-        super(detail, 'Mismatched proof purpose', -18);
+        super(detail, 'Proof transformation error', -18);
     }
 }
-exports.Mismatched_Proof_Purpose = Mismatched_Proof_Purpose;
+exports.Proof_Transformation_Error = Proof_Transformation_Error;
 class Invalid_Verification_Method extends ProblemDetail {
     constructor(detail) {
         super(detail, 'Invalid verification method', -24);

@@ -14,13 +14,16 @@ export { generateKey } from './lib/crypto_utils';
  * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in
  * multibase format, using base64url encoding. Keys are accepted in JWK format (and stored in JWK or in Multikey, depending on the crypto key).
  *
+ * A single previous proof reference may also be set, although that really makes sense in the case of a single key only
+ *
  * @param dataset
  * @param keyData
+ * @param previous - A previous proof ID, when applicable
  * @throws - Error if there was an issue while signing.
  * @returns
  */
-export declare function generateProofGraph(dataset: rdf.DatasetCore, keyData: Iterable<KeyData>): Promise<rdf.DatasetCore[]>;
-export declare function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyData): Promise<rdf.DatasetCore>;
+export declare function generateProofGraph(dataset: rdf.DatasetCore, keyData: Iterable<KeyData>, previous?: rdf.Quad_Subject): Promise<rdf.DatasetCore[]>;
+export declare function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyData, previous?: rdf.Quad_Subject): Promise<rdf.DatasetCore>;
 /**
  * Verify the separate proof graph.
  *
@@ -47,9 +50,17 @@ export declare function verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: r
  * dataset (a.k.a. "Embedded Proof" in the DI spec terminology).
  *
  * If the anchor is defined, then that will be the subject for quads with the `proof` property is added (one for each proof graph).
+ * In the case of a VC, the ID of the credential itself is naturally the anchor, but there is no such "natural" node for a general
+ * RDF dataset.
  *
- * If the `keyPair` argument is an Array, then the proof graphs are considered to be a Proof Chain. Otherwise,
+ * If the `keyPair` argument is an Array, then the proof graphs are considered to define a Proof Chain. Otherwise,
  * (e.g., if it is a Set), it is a Proof Set.
+ * Proof chains are somewhat restricted compared to the specification: proof chains and sets are not mixed. In other words, either
+ * all proofs are part of a chain or form a chain; the case when a previous proof reference points at a set of proofs is not possible.
+ *
+ * The anchor should exist to create a proper chain per spec, because the spec requires it to sign over the previous proof reference. The chain
+ * will be created in the absence of an anchor, but the result will not be conform to the specification (that _requires_ the addition of a proof
+ * reference triple).)
  *
  * @param dataset
  * @param keyData
@@ -61,7 +72,8 @@ export declare function embedProofGraph(dataset: rdf.DatasetCore, keyData: KeyDa
  * Verify the dataset with embedded proof graph(s).
  *
  * If the anchor is present, the proof graphs are identified by the object terms of the corresponding [`proof`](https://www.w3.org/TR/vc-data-integrity/#proofs) quads.
- * Otherwise, the type relationship to [`DataIntegrityProof`](https://www.w3.org/TR/vc-data-integrity/#dataintegrityproof) are considered. Note that if no anchor is provided, this second choice
+ * Otherwise, the type relationship to [`DataIntegrityProof`](https://www.w3.org/TR/vc-data-integrity/#dataintegrityproof) are considered.
+ * Note that if no anchor is provided, this second choice
  * may lead to erroneous results because some of the embedded proof graphs are not meant to be a proof for the full dataset. (This may
  * be the case in a ["Verifiable Presentation" style datasets](https://www.w3.org/TR/vc-data-model-2.0/#presentations-0).)
  *

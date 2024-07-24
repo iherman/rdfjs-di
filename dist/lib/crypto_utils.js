@@ -190,7 +190,7 @@ exports.sign = sign;
 async function verify(report, message, signature, publicKey) {
     const rawMessage = textToArrayBuffer(message);
     if (signature.length === 0 || signature[0] !== 'u') {
-        report.errors.push(new types.Malformed_Proof_Error(`Signature is of an incorrect format (${signature})`));
+        report.errors.push(new types.Proof_Verification_Error(`Signature is of an incorrect format (${signature})`));
         return false;
     }
     const rawSignature = base64UrlToArrayBuffer(signature.slice(1));
@@ -203,6 +203,9 @@ async function verify(report, message, signature, publicKey) {
         try {
             const key = await crypto.subtle.importKey("jwk", publicKey, algorithm, true, ["verify"]);
             const retval = await crypto.subtle.verify(algorithm, key, rawSignature, rawMessage);
+            if (retval === false) {
+                report.errors.push(new types.Proof_Verification_Error(`Signature ${signature} is invalid`));
+            }
             return retval;
         }
         catch (e) {
