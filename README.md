@@ -12,14 +12,16 @@ It is proof-of-concepts, meaning that it is not production ready, and there are 
 - Primarily at validation time, it doesn't do all the checks that the DI specification defines.
 - In contrast with the DI specification, the Verification Method (ie, the public key) is expected to be be present in the input. In other words, the package does not retrieve the keys through a URL, it looks for the respective quads in the input dataset.
 - Although it implements the the [EdDSA](https://www.w3.org/TR/vc-di-eddsa/) and [ECDSA](https://www.w3.org/TR/vc-di-ecdsa/) cryptosuites, the Multikey encoding of the latter is not yet conform to the Multikey specification.
-The difference is that the Multikey encoding is done on the uncompressed crypto key as opposed to the compressed one, which is required by the specification. 
+The difference is that the Multikey encoding is done on the uncompressed crypto key as opposed to the compressed one, which is required by the specification.
 (I have not yet found a reliable package, that also works with TypeScript, to uncompress a compressed key.)
+- The management of proof chains is a bit restricted compared to the specification: proof chains and sets are not mixed. In other words, either all proofs are part of a chain or form a chain; the case when a previous proof reference points at a set of proofs has not been implemented.
 - It has not (yet) been cross-checked with other DI implementations and, in general, should be much more thoroughly tested.
 
-There is also a missing feature in the DI specification regarding the usage for Datasets in general. For a Verifiable Credential there is a natural "anchor" Resource used to "connect" the input dataset with its proof. 
+There is also a missing feature in the DI specification regarding the usage for Datasets in general. For a Verifiable Credential there is a natural "anchor" Resource used to "connect" the input dataset with its proof.
 This is generally not true (see, e.g. [separate discussion](https://github.com/w3c/vc-data-model/issues/1248)) and, in this implementation, it must be provided explicitly to embed the proof into the dataset.
 
-What the implementation proves, however, is that the _DI specification may indeed be used, with minor adjustment on the "anchor", to provide a proof for an RDF Dataset in the form of a separate "Proof Graph"_, i.e., an RDF Graph containing a signature and its metadata that can be separated by a verifier.
+What the implementation proves, however, is that the 
+_DI specification may indeed be used, with minor adjustment on the "anchor", to provide proofs for an RDF Dataset in the form of separate "Proof Graphs"_, i.e., RDF Graphs containing a signature and its metadata that can be separately verified.
 
 ## Some details
 
@@ -30,6 +32,8 @@ The steps for signature follow the "usual" approach for signing data, namely:
 3. A "proof option graph" is created, which includes crypto keys and some metadata. The key is stored in [JWK](https://www.rfc-editor.org/rfc/rfc7517) or in Multikey formats: the former is used for RSA keys (for which no Multikey encoding has been specified) and the latter is used for ECDSA and EdDSA, as required by the respective cryptosuite specifications. This separate graph is also canonicalized, sorted, and hashed.
 4. The the two hash values are concatenated (in the order of the proof option graph and the original dataset), and signed using a secret key. The signature value is stored as a base64url value following the [Multibase](https://datatracker.ietf.org/doc/draft-multiformats-multibase) format, and its value is added to the proof option graph (turning it into a proof graph).
 
+An extra complication occurs for proof chains: the specification requires that the previous proof in the chain is also "signed over", i.e., the dataset is expanded to include, for the purpose of a signature, the previous proof graph in its entirety.
+
 The package has separate API entries to generate, and validate, such proof graphs. It is also possible, following the DI spec, to provide "embedded" proofs, i.e., a new dataset, containing the original data, as well as the proof graph(s), each as a separate graph within an RDF dataset. If a separate "anchor" resource is provided, then this new dataset will also contain additional RDF triples connecting the anchor to the proof graphs.
 
 The crypto layer for the package relies on the Web Crypto API specification, and its implementation in `node.js` or `deno`. Accordingly, the following crypto algorithms are available for this implementation
@@ -39,16 +43,17 @@ The crypto layer for the package relies on the Web Crypto API specification, and
 - [RSA-PSS](https://w3c.github.io/webcrypto/#rsa-pss). No DI cryptosuite specification exists.
 - [RSASSA-PKCS1-v1_5](https://w3c.github.io/webcrypto/#rsassa-pkcs1). No DI cryptosuite specification exists.
 
-Although not strictly necessary for this package, a separate method is available as part of the API to generate cryptography keys for one of these four algorithms. 
+Although not strictly necessary for this package, a separate method is available as part of the API to generate cryptography keys for one of these four algorithms.
 The first two algorithms are specified by cryptosuites, identified as `eddsa-rdfc-2022` and `ecdsa-rdfc-2019`, respectively.
-The other two are non-standard, and are identified with the temporary cryptosuite name of `rsa-pss-rdfc-ih` and `rsa-ssa-rdfc-ih`, respectively. Note that there is no Multikey encoding for RSA keys, so the keys are stored in JWK format as a literal with an `rdf:JSON` datatype.
+The other two are non-standard, and are identified with the temporary cryptosuite name of `rsa-pss-rdfc-ih` and `rsa-ssa-rdfc-ih`, respectively.
+Note that there is no Multikey encoding for RSA keys, so the keys are stored in JWK format as a literal with an `rdf:JSON` datatype.
 
 The user facing APIs use the JWK encoding of the keys only. This makes it easier for the user; Web Crypto provides JWK export "out of the box", and it becomes more complicated for Multikey. This may be changed in future.
 
 For more details, see:
 
 - [Separate document for the API](https://iherman.github.io/rdfjs-di/modules/index.html)
-- [A small RDF graph](https://github.com/iherman/rdfjs-di/blob/main/examples/small.ttl) and its ["verifiable" version with embedded proof graphs](https://github.com/iherman/rdfjs-di/blob/main/examples/small_with_proofs.ttl) 
+- [A small RDF graph](https://github.com/iherman/rdfjs-di/blob/main/examples/small.ttl) and its ["verifiable" version with embedded proof graphs](https://github.com/iherman/rdfjs-di/blob/main/examples/small_with_proofs.ttl).
 
 (Note that the API works on an RDF Data model level, and does not include a Turtle/TriG parser or serializer; that should be done separately.)
 

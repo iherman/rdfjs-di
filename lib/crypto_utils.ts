@@ -234,7 +234,7 @@ export async function sign(report: Errors, message: string, secretKey: JsonWebKe
 export async function verify(report: Errors, message: string, signature: string, publicKey: JsonWebKey): Promise<boolean> {
     const rawMessage: ArrayBuffer = textToArrayBuffer(message);
     if (signature.length === 0 || signature[0] !== 'u') {
-        report.errors.push(new types.Malformed_Proof_Error(`Signature is of an incorrect format (${signature})`));
+        report.errors.push(new types.Proof_Verification_Error(`Signature is of an incorrect format (${signature})`));
         return false;
     }
     const rawSignature: ArrayBuffer = base64UrlToArrayBuffer(signature.slice(1));
@@ -248,6 +248,9 @@ export async function verify(report: Errors, message: string, signature: string,
         try {
             const key: CryptoKey = await crypto.subtle.importKey("jwk", publicKey, algorithm, true, ["verify"]);
             const retval: boolean = await crypto.subtle.verify(algorithm, key, rawSignature, rawMessage);
+            if (retval === false) {
+                report.errors.push(new types.Proof_Verification_Error(`Signature ${signature} is invalid`));
+            }
             return retval;
         } catch(e) {
             report.errors.push(new types.Proof_Generation_Error(e.message));

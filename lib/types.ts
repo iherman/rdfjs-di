@@ -69,15 +69,15 @@ export class Proof_Generation_Error extends ProblemDetail {
     }
 }
 
-export class Malformed_Proof_Error extends ProblemDetail {
+export class Proof_Verification_Error extends ProblemDetail {
     constructor(detail: string) {
-        super(detail, 'Malformed proof error', -17);
+        super(detail, 'Proof verification error', -17);
     }
 }
 
-export class Mismatched_Proof_Purpose extends ProblemDetail {
+export class Proof_Transformation_Error extends ProblemDetail {
     constructor(detail: string) {
-        super(detail, 'Mismatched proof purpose', -18);
+        super(detail, 'Proof transformation error', -18);
     }
 }
 
