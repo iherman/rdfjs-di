@@ -11,17 +11,13 @@ It is proof-of-concepts, meaning that it is not production ready, and there are 
 
 - Primarily at validation time, it doesn't do all the checks that the DI specification defines.
 - In contrast with the DI specification, the Verification Method (ie, the public key) is expected to be be present in the input. In other words, the package does not retrieve the keys through a URL, it looks for the respective quads in the input dataset.
-- Although it implements the the [EdDSA](https://www.w3.org/TR/vc-di-eddsa/) and [ECDSA](https://www.w3.org/TR/vc-di-ecdsa/) cryptosuites, the Multikey encoding of the latter is not yet conform to the Multikey specification.
-The difference is that the Multikey encoding is done on the uncompressed crypto key as opposed to the compressed one, which is required by the specification.
-(I have not yet found a reliable package, that also works with TypeScript, to uncompress a compressed key.)
 - The management of proof chains is a bit restricted compared to the specification: proof chains and sets are not mixed. In other words, either all proofs are part of a chain or form a chain; the case when a previous proof reference points at a set of proofs has not been implemented.
 - It has not (yet) been cross-checked with other DI implementations and, in general, should be much more thoroughly tested.
 
 There is also a missing feature in the DI specification regarding the usage for Datasets in general. For a Verifiable Credential there is a natural "anchor" Resource used to "connect" the input dataset with its proof.
 This is generally not true (see, e.g. [separate discussion](https://github.com/w3c/vc-data-model/issues/1248)) and, in this implementation, it must be provided explicitly to embed the proof into the dataset.
 
-What the implementation proves, however, is that the 
-_DI specification may indeed be used, with minor adjustment on the "anchor", to provide proofs for an RDF Dataset in the form of separate "Proof Graphs"_, i.e., RDF Graphs containing a signature and its metadata that can be separately verified.
+What the implementation proves, however, is that the _DI specification may indeed be used, with minor adjustment on the "anchor", to provide proofs for an RDF Dataset in the form of separate "Proof Graphs"_, i.e., RDF Graphs containing a signature and its metadata that can be separately verified.
 
 ## Some details
 
