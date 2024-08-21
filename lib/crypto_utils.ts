@@ -33,7 +33,7 @@ export type Kty = "EC" | "RSA" | "OKP";
  */
 interface WebCryptoAPIData {
     name:         string,
-    hash ?:       Hsh;
+    hash?:        Hsh;
     saltLength?:  number;
     namedCurve ?: Crv;
 }

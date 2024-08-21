@@ -38,7 +38,8 @@ async function generateKey(suite: Cryptosuites, keyData?: KeyDetails): Promise<C
 
 (async () => {
 
-    const key = await generateKey(Cryptosuites.eddsa);
+    // const key = await generateKey(Cryptosuites.eddsa);
+    const key = await generateKey(Cryptosuites.ecdsa, { namedCurve: "P-384" });
 
     const v = {
         "public": await crypto.subtle.exportKey('jwk', key.publicKey),
@@ -48,19 +49,7 @@ async function generateKey(suite: Cryptosuites, keyData?: KeyDetails): Promise<C
         "expires": "2055-02-24T00:00",
     };
 
-    console.log(JSON.stringify(v,null,4));
-
-
-
-
-    // const { cryptosuite, multikey } = await keyToMultikey(key);
-    // console.log(await crypto.subtle.exportKey('jwk', key.privateKey))
-    // console.log(await crypto.subtle.exportKey('jwk', key.publicKey))
-
-    // console.log(`suite: ${cryptosuite}; key: ${multikey}`);
-
-    // // const convertedKey = await multikeyToKey(multikey);
-    // console.log(await crypto.subtle.exportKey('jwk', convertedKey))
+    console.log(JSON.stringify(v, null, 4));
 
 
     // const eddsa = await generateKey(Cryptosuites.eddsa);

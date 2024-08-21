@@ -24,6 +24,33 @@
         "controller": "https://www.ivan-herman.net#me",
         "expires": "2055-02-24T00:00:00Z"
     },
+
+    {
+        "public": {
+            "key_ops": [
+                "verify"
+            ],
+            "ext": true,
+            "kty": "EC",
+            "x": "BgpUsNV8nNAvKhninmFxZNE7g30BUqbCoalDYbKfFykEafP0fgc880xfnmnNVsqk",
+            "y": "NoXC4tHfmOdDoJb5vC42WVZ7TV0BCz2YiqhHs0xFeiOho-1FI_ji6viwjp_deiig",
+            "crv": "P-384"
+        },
+        "private": {
+            "key_ops": [
+                "sign"
+            ],
+            "ext": true,
+            "kty": "EC",
+            "x": "BgpUsNV8nNAvKhninmFxZNE7g30BUqbCoalDYbKfFykEafP0fgc880xfnmnNVsqk",
+            "y": "NoXC4tHfmOdDoJb5vC42WVZ7TV0BCz2YiqhHs0xFeiOho-1FI_ji6viwjp_deiig",
+            "crv": "P-384",
+            "d": "ig7oeM47OuLp5vPk8Xb6s1X3yjeFuvdF_U5sgr6yp_J5R3igDX18L97bdI96RLbF"
+        },
+        "controller": "https://www.ivan-herman.net/foaf#me",
+        "cryptosuite": "ecdsa-rdfc-2022",
+        "expires": "2055-02-24T00:00"
+    },
     {
         "private" : {
             "key_ops": [
