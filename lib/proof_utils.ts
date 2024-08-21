@@ -14,12 +14,13 @@ import * as rdf       from '@rdfjs/types';
 import * as n3        from 'n3';
 import { v4 as uuid } from 'uuid';
 import { canonify }   from '@truestamp/canonify';
+import * as mkwc      from "../../../VC/multikey-webcrypto";
 
 import * as types                                          from './types';
 import { Errors, KeyData }                                 from './types';
-import { createPrefix, ProofStore, calculateDatasetHash } from './utils';
-import { sign, verify, cryptosuiteId, algorithmData }      from './crypto_utils';
-import { multikeyToKey, keyToMultikey }                    from './multikey';
+import { createPrefix, ProofStore, calculateDatasetHash }  from './utils';
+import { sign, verify, cryptosuiteId }                     from './crypto_utils';
+
 import * as debug                                          from './debug';
 
 // n3.DataFactory is a namespace with some functions...
@@ -103,7 +104,8 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
         let retval: rdf.Quad[] = [];
         if (jsonKey.kty === "OKP" || jsonKey.kty === "EC") {
             // We are in multikey land...
-            const { cryptosuite, multikey } = keyToMultikey(jsonKey);  // It may be simpler to go from JWK rather than converting all this into a crypto key
+            // const { cryptosuite, multikey } = keyToMultikey(jsonKey);  // It may be simpler to go from JWK rather than converting all this into a crypto key
+            const  multikey  =  mkwc.JWKToMultikey(jsonKey);  
             retval = [
                 quad(proofGraph, sec_prefix('cryptosuite'), literal(cryptosuite)),
                 quad(keyResource, rdf_type, sec_prefix('Multikey')),
@@ -269,7 +271,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
                 return null;
             } else if (keys_multikey.length === 1) {
                 try {
-                    const key: JsonWebKey = multikeyToKey(keys_multikey[0].object.value);
+                    const key: JsonWebKey = mkwc.multikeyToJWK(keys_multikey[0].object.value);
                     return key;
                 } catch(e) {
                     localWarnings.push(new types.Proof_Verification_Error(`Parsing error for Multikey: ${e.message}`));

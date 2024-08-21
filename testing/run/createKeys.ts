@@ -3,9 +3,8 @@ import {
     generateProofGraph, verifyProofGraph,
     embedProofGraph, verifyEmbeddedProofGraph
 } from '../../index';
-import { KeyDetails }                   from '../../lib/crypto_utils';
-import { Cryptosuites }                 from '../../lib/types';
-import { keyToMultikey, multikeyToKey } from '../../lib/multikey';
+import { KeyDetails }   from '../../lib/crypto_utils';
+import { Cryptosuites } from '../../lib/types';
 
 
 async function generateKey(suite: Cryptosuites, keyData?: KeyDetails): Promise<CryptoKeyPair> {

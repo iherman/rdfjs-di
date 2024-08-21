@@ -4,9 +4,9 @@
  * @packageDocumentation
  */
 
-import * as n3 from 'n3';
+import * as n3  from 'n3';
 import * as rdf from '@rdfjs/types';
-import * as fs from 'node:fs';
+import * as fs  from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 
 const DEBUG: boolean = false;

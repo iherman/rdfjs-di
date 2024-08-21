@@ -7,10 +7,10 @@
 
 // deno-lint-ignore-file no-inferrable-types
 /// <reference types="node" />
-import * as rdf          from '@rdfjs/types';
-import * as n3           from 'n3';
-import * as types        from './lib/types';
-import * as debug        from './lib/debug';
+import * as rdf   from '@rdfjs/types';
+import * as n3    from 'n3';
+import * as types from './lib/types';
+import * as debug from './lib/debug';
 
 import { Errors, KeyData, VerificationResult, Cryptosuites } from './lib/types';
 import { 
