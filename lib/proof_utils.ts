@@ -99,12 +99,11 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
     const cryptosuite = keyData?.cryptosuite || cryptosuiteId(report, keyData)
 
     // Generate the key data to be stored in the proof graph; either multikey or jwk, depending on the cryptosuite
-    const addKeyResource = async (jsonKey: JsonWebKey, proofGraph: rdf.Quad_Subject, keyResource: rdf.Quad_Subject): Promise<rdf.Quad[]> => {
+    const addKeyResource = (jsonKey: JsonWebKey, proofGraph: rdf.Quad_Subject, keyResource: rdf.Quad_Subject): rdf.Quad[] => {
         let retval: rdf.Quad[] = [];
         if (jsonKey.kty === "OKP" || jsonKey.kty === "EC") {
             // We are in multikey land...
-            const key = await crypto.subtle.importKey("jwk", jsonKey, algorithmData(report, jsonKey), true, ['verify']);
-            const {cryptosuite, multikey} = await keyToMultikey(key);
+            const { cryptosuite, multikey } = keyToMultikey(jsonKey);  // It may be simpler to go from JWK rather than converting all this into a crypto key
             retval = [
                 quad(proofGraph, sec_prefix('cryptosuite'), literal(cryptosuite)),
                 quad(keyResource, rdf_type, sec_prefix('Multikey')),
@@ -121,7 +120,7 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
     }
 
     // Create a proof graph. Just a boring set of quad generations...
-    const createProofOptionGraph = async (): Promise<{ proofGraph: rdf.DatasetCore, proofGraphResource: rdf.NamedNode}> => {
+    const createProofOptionGraph = (): { proofGraph: rdf.DatasetCore, proofGraphResource: rdf.NamedNode } => {
         const proofGraph: n3.Store = new n3.Store();
 
         // Unique URL-s, for the time being as uuid-s
@@ -153,13 +152,13 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
         if (keyData.controller) proofGraph.add(quad(keyResource, sec_prefix('controller'), namedNode(keyData.controller)));
         if (keyData.expires) proofGraph.add(quad(keyResource, sec_expires, literal(keyData.expires, xsd_datetime)));
         if (keyData.revoked) proofGraph.add(quad(keyResource, sec_revoked, literal(keyData.revoked, xsd_datetime)));
-        proofGraph.addQuads(await addKeyResource(keyData.public, proofGraphResource, keyResource));
+        proofGraph.addQuads(addKeyResource(keyData.public, proofGraphResource, keyResource));
 
         return { proofGraph, proofGraphResource }
     };
 
     // Put together the proof option graph and calculate its hash
-    const { proofGraph, proofGraphResource } = await createProofOptionGraph();
+    const { proofGraph, proofGraphResource } = createProofOptionGraph();
     const proofOptionHashValue  = await calculateProofOptionsHash(proofGraph);
 
     // This is the extra trick in the cryptosuite specifications: the signature is upon the 
@@ -218,7 +217,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
         return proof_values[0].object.value;
     };
 
-    const getPublicKey = async (store: n3.Store): Promise<JsonWebKey | null> => {
+    const getPublicKey = (store: n3.Store): JsonWebKey | null => {
         // first see if the verificationMethod has been set properly
         const verificationMethod: rdf.Quad[] = store.getQuads(null, sec_verificationMethod, null, null);
         if (verificationMethod.length === 0) {
@@ -270,8 +269,8 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
                 return null;
             } else if (keys_multikey.length === 1) {
                 try {
-                    const key: CryptoKey = await multikeyToKey(keys_multikey[0].object.value);
-                    return crypto.subtle.exportKey('jwk', key);
+                    const key: JsonWebKey = multikeyToKey(keys_multikey[0].object.value);
+                    return key;
                 } catch(e) {
                     localWarnings.push(new types.Proof_Verification_Error(`Parsing error for Multikey: ${e.message}`));
                     return null;
@@ -293,7 +292,6 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
             localErrors.push(new types.Invalid_Verification_Method("More than one JWK encoded keys"));
             return null;
         }
-
     };
 
     // Check the "proofPurpose" property value
@@ -316,7 +314,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
 
     // Retrieve necessary values with checks
     checkProofPurposes(proof);
-    const publicKey: JsonWebKey | null = await getPublicKey(proof);
+    const publicKey: JsonWebKey | null = getPublicKey(proof);
     const proofValue: string | null = getProofValue(proof);
 
     // The final set of error/warning should be modified with the proof graph's ID, if applicable
