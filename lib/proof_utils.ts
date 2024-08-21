@@ -104,7 +104,6 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
         let retval: rdf.Quad[] = [];
         if (jsonKey.kty === "OKP" || jsonKey.kty === "EC") {
             // We are in multikey land...
-            // const { cryptosuite, multikey } = keyToMultikey(jsonKey);  // It may be simpler to go from JWK rather than converting all this into a crypto key
             const  multikey  =  mkwc.JWKToMultikey(jsonKey);  
             retval = [
                 quad(proofGraph, sec_prefix('cryptosuite'), literal(cryptosuite)),

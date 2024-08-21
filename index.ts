@@ -30,7 +30,7 @@ import {
 /* This file is also the "top level", so a number of exports are put here to be more friendly to users */
 export type { KeyData, VerificationResult, KeyMetadata } from './lib/types';
 export type { KeyDetails }                               from './lib/crypto_utils';
-export { Cryptosuites}                                   from './lib/types';
+export { Cryptosuites }                                  from './lib/types';
 export { generateKey }                                   from './lib/crypto_utils';
 
 // n3.DataFactory is a namespace with some functions...
@@ -94,7 +94,7 @@ export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyD
  * @returns 
  */
 export async function verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore | rdf.DatasetCore[]): Promise<VerificationResult> {
-    const report: Errors = { errors: [], warnings: [] }    
+    const report: Errors = { errors: [], warnings: [] }
     const hash: string = await calculateDatasetHash(dataset);
     const proofGraphs: rdf.DatasetCore[] = isDatasetCore(proofGraph) ? [proofGraph] : proofGraph;
     const proofs = proofGraphs.map((pr: rdf.DatasetCore): ProofStore => {
@@ -277,7 +277,7 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
     // By now, we got the identification of all the proof graphs, we can separate the quads into 
     // the "real" data graph and the relevant proof graphs
     for (const q of dataset) {
-        if (q.predicate.equals(sec_proof) && proofGraphs.has(q.graph)) {
+        if (q.predicate.equals(sec_proof) && proofGraphs.has(q.object)) {
             // this is an extra entry, not part of the triples that were signed
             // neither it is part of any proof graphs
             continue;
