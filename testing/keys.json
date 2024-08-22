@@ -6,32 +6,6 @@
             ],
             "ext": true,
             "kty": "EC",
-            "x": "LHGayjy__zWhz14u7vWyGbPWkXNdJN1AnhKiQTv3uK8",
-            "y": "9T4ThlFhLi84d3LOaOkvrzLrr_EEczB0sIv3S3vzdd8",
-            "crv": "P-256"
-        },
-        "private": {
-            "key_ops": [
-                "sign"
-            ],
-            "ext": true,
-            "kty": "EC",
-            "x": "LHGayjy__zWhz14u7vWyGbPWkXNdJN1AnhKiQTv3uK8",
-            "y": "9T4ThlFhLi84d3LOaOkvrzLrr_EEczB0sIv3S3vzdd8",
-            "crv": "P-256",
-            "d": "4Gd_JxAFt1zA2kWMyMyRlJcEtyw2eIroUmbXawfT5Ls"
-        },
-        "controller": "https://www.ivan-herman.net#me",
-        "expires": "2055-02-24T00:00:00Z"
-    },
-
-    {
-        "public": {
-            "key_ops": [
-                "verify"
-            ],
-            "ext": true,
-            "kty": "EC",
             "x": "BgpUsNV8nNAvKhninmFxZNE7g30BUqbCoalDYbKfFykEafP0fgc880xfnmnNVsqk",
             "y": "NoXC4tHfmOdDoJb5vC42WVZ7TV0BCz2YiqhHs0xFeiOho-1FI_ji6viwjp_deiig",
             "crv": "P-384"
@@ -50,6 +24,31 @@
         "controller": "https://www.ivan-herman.net/foaf#me",
         "cryptosuite": "ecdsa-rdfc-2022",
         "expires": "2055-02-24T00:00"
+    },
+    {
+        "public": {
+            "key_ops": [
+                "verify"
+            ],
+            "ext": true,
+            "kty": "EC",
+            "x": "LHGayjy__zWhz14u7vWyGbPWkXNdJN1AnhKiQTv3uK8",
+            "y": "9T4ThlFhLi84d3LOaOkvrzLrr_EEczB0sIv3S3vzdd8",
+            "crv": "P-256"
+        },
+        "private": {
+            "key_ops": [
+                "sign"
+            ],
+            "ext": true,
+            "kty": "EC",
+            "x": "LHGayjy__zWhz14u7vWyGbPWkXNdJN1AnhKiQTv3uK8",
+            "y": "9T4ThlFhLi84d3LOaOkvrzLrr_EEczB0sIv3S3vzdd8",
+            "crv": "P-256",
+            "d": "4Gd_JxAFt1zA2kWMyMyRlJcEtyw2eIroUmbXawfT5Ls"
+        },
+        "controller": "https://www.ivan-herman.net#me",
+        "expires": "2055-02-24T00:00:00Z"
     },
     {
         "private" : {

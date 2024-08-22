@@ -211,7 +211,7 @@ export async function sign(report: Errors, message: string, secretKey: JsonWebKe
             const key: CryptoKey = await crypto.subtle.importKey("jwk", secretKey, algorithm, true, ["sign"]);
             const rawSignature: ArrayBuffer = await crypto.subtle.sign(algorithm, key, rawMessage);
             
-            // Turn the the signature into Base64URL, and the into multicode
+            // Turn the the signature into Base64URL, and then into multicode
             return `u${arrayBufferToBase64Url(rawSignature)}`;
         } catch(e) {
             report.errors.push(new types.Proof_Generation_Error(e.message));

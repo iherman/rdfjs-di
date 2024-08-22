@@ -251,11 +251,20 @@ export function isKeyData(obj: any): obj is KeyMetadata {
 /**
  * Calculate the canonical hash of a dataset using the implementation of RDFC 1.0.
  * 
+ * Note that the hash calculation's detail depend on the crypto key being used.
+ * If the key belongs to an ECDSA key, and the corresponding curve is P-384, then
+ * SHA-384 must be used by the algorithm. Hence the presence of the second
+ * argument in the call.
+ * 
  * @param dataset 
+ * @param key - to decide whether SHA-384 should be used instead of the (default) SHA-256
  * @returns 
  */
-export async function calculateDatasetHash(dataset: rdf.DatasetCore): Promise<string> {
+export async function calculateDatasetHash(dataset: rdf.DatasetCore, key ?: JsonWebKey): Promise<string> {
     const rdfc10 = new RDFC10();
+    if (key && key?.kty === "EC" && key?.crv === "P-384") {
+        rdfc10.hash_algorithm = "sha384";
+    }
     const canonical_quads: string = await rdfc10.canonicalize(dataset);
     const datasetHash: string = await rdfc10.hash(canonical_quads);
     return datasetHash;

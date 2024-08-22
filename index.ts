@@ -23,11 +23,10 @@ import {
     rdf_type, 
     sec_di_proof, 
     sec_proof, 
-    sec_prefix, 
     sec_previousProof
-}   from './lib/proof_utils';
+} from './lib/proof_utils';
 
-/* This file is also the "top level", so a number of exports are put here to be more friendly to users */
+/* This file is also the entry module to the package; a number of exports are put here to be more friendly to users */
 export type { KeyData, VerificationResult, KeyMetadata } from './lib/types';
 export type { KeyDetails }                               from './lib/crypto_utils';
 export { Cryptosuites }                                  from './lib/types';
@@ -54,13 +53,17 @@ export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyD
     // Start fresh with results
     const report: Errors = { errors : [], warnings : [] }
 
-    // This is to be signed
-    const toBeSigned = await calculateDatasetHash(dataset);
+    // This is not optimal. It will regenerate the hash for every key and, except for an occasional ECDSA+P-384, it will generate the same data. 
+    // Some sort of a caching information on the hash values could replace this, but that is left for later...
+    const signAndGenerate = async (keypair: KeyData): Promise<rdf.DatasetCore> => {
+        const toBeSigned = await calculateDatasetHash(dataset, keypair.public);
+        return generateAProofGraph(report, toBeSigned, keypair, previous);
+    }
 
     // prepare for the overload of arguments
     const keyPairs: Iterable<KeyData> = isKeyData(keyData) ? [keyData] : keyData;
     // execute the proof graph generation concurrently
-    const promises: Promise<rdf.DatasetCore>[] = Array.from(keyPairs).map((keypair: KeyData) => generateAProofGraph(report, toBeSigned, keypair, previous));
+    const promises: Promise<rdf.DatasetCore>[] = Array.from(keyPairs).map(signAndGenerate);
     const retval: rdf.DatasetCore[] = await Promise.all(promises);
     // return by taking care of overloading.
     if (report.errors.length !== 0) {
@@ -95,7 +98,6 @@ export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyD
  */
 export async function verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore | rdf.DatasetCore[]): Promise<VerificationResult> {
     const report: Errors = { errors: [], warnings: [] }
-    const hash: string = await calculateDatasetHash(dataset);
     const proofGraphs: rdf.DatasetCore[] = isDatasetCore(proofGraph) ? [proofGraph] : proofGraph;
     const proofs = proofGraphs.map((pr: rdf.DatasetCore): ProofStore => {
         return {
@@ -103,7 +105,7 @@ export async function verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf
             proofGraph: undefined,
         };
     });
-    const verified: boolean = await verifyProofGraphs(report, hash, proofs);
+    const verified: boolean = await verifyProofGraphs(report, dataset, proofs);
     
     return {
         verified,
@@ -327,8 +329,7 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
                 // (This is an n3 specific API method!)
                 dataStore.addQuads(extraQuads);
 
-                const hash: string = await calculateDatasetHash(dataStore);
-                const verifiedChainLink: boolean = await verifyProofGraphs(report, hash, [allProofs[i]]);
+                const verifiedChainLink: boolean = await verifyProofGraphs(report, dataStore, [allProofs[i]]);
                 verified_list.push(verifiedChainLink);
 
                 dataStore.removeQuads(extraQuads);
@@ -345,9 +346,8 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
     } else {
         // This is the simple case...
 
-        const hash: string = await calculateDatasetHash(dataStore);
         const proofs: ProofStore[] = proofGraphs.data();
-        const verified: boolean = await verifyProofGraphs(report, hash, proofs);
+        const verified: boolean = await verifyProofGraphs(report, dataStore, proofs);
         return {
             verified,
             verifiedDocument: verified ? dataStore : null,

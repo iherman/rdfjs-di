@@ -52,18 +52,17 @@ export const sec_created: rdf.NamedNode              = sec_prefix('created');
 export const xsd_datetime: rdf.NamedNode             = xsd_prefix('dateTime');
 export const sec_previousProof: rdf.NamedNode        = sec_prefix("previousProof");
 
-
 /**
  * The proof option graph is the collection of all quads in a proof graph, except the proof
- * value. The hash of this graph is combined with the hash of the original data.
+ * value setting triple. The hash of this graph is combined with the hash of the original data.
  * 
  * This function does one more step before hashing: it canonicalizes the (possible) JWK key. This
- * key is in a JSON Literal; this must be canonicalized to ensure a proper validation.
+ * key is in a JSON Literal; this must be canonicalized to ensure proper validation.
  * 
  * @param proofGraph 
  * @returns 
  */
-async function calculateProofOptionsHash(proofGraph: rdf.DatasetCore): Promise<string> {
+async function calculateProofOptionsHash(proofGraph: rdf.DatasetCore, key: JsonWebKey): Promise<string> {
     const proofOptions = new n3.Store();
     // The proof option graph is a copy of the proof graph quads, except that:
     // 1. the proof value triple should be removed
@@ -83,7 +82,7 @@ async function calculateProofOptionsHash(proofGraph: rdf.DatasetCore): Promise<s
     // The return value must be the hash of the proof option graph
     // debug.log(`The proof graph to hash:`, proofOptions);
     // debug.log('\n');
-    return await calculateDatasetHash(proofOptions);
+    return await calculateDatasetHash(proofOptions, key);
 }
 
 /**
@@ -160,7 +159,7 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
 
     // Put together the proof option graph and calculate its hash
     const { proofGraph, proofGraphResource } = createProofOptionGraph();
-    const proofOptionHashValue  = await calculateProofOptionsHash(proofGraph);
+    const proofOptionHashValue  = await calculateProofOptionsHash(proofGraph, keyData.public);
 
     // This is the extra trick in the cryptosuite specifications: the signature is upon the 
     // concatenation of the original dataset's hash and the hash of the proof option graph.
@@ -197,12 +196,12 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
  * Errors are stored in the `report` structure. If any error occurs, the result is false.
  * 
  * @param report - placeholder for error reports
- * @param hash 
+ * @param dataset - the original dataset 
  * @param proof - the proof graph
  * @param proofId - Id of the proof graph, if known; used in the error reports only
  * @returns 
  */
-async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, proofId: rdf.Quad_Graph | undefined): Promise < boolean> {
+async function verifyAProofGraph(report: Errors, dataset: rdf.DatasetCore, proof: n3.Store, proofId: rdf.Quad_Graph | undefined): Promise < boolean> {
     const localErrors   : types.ProblemDetail[] = [];
     const localWarnings : types.ProblemDetail[] = [];
 
@@ -317,6 +316,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
     checkProofPurposes(proof);
     const publicKey: JsonWebKey | null = getPublicKey(proof);
     const proofValue: string | null = getProofValue(proof);
+    const hash: string = await calculateDatasetHash(dataset, publicKey);
 
     // The final set of error/warning should be modified with the proof graph's ID, if applicable
     if (proofId !== undefined) {
@@ -333,7 +333,7 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
     // Here we go with checking...
     if (publicKey !== null && proofValue !== null) {
         // First the proof option graph must be created and then hashed
-        const proofOptionGraphHash = await calculateProofOptionsHash(proof);
+        const proofOptionGraphHash = await calculateProofOptionsHash(proof, publicKey);
         /* @@@@@ */ debug.log(`Verifying ${proofOptionGraphHash} + ${hash}`)
         const check_results = await verify(report, proofOptionGraphHash + hash, proofValue, publicKey);
 
@@ -362,17 +362,17 @@ async function verifyAProofGraph(report: Errors, hash: string, proof: n3.Store, 
  * If any error occurs in any proof graph the result is `false`; otherwise, result is the conjunction of each individual proof graph verifications. 
  * 
  * @param report - placeholder for error reports
- * @param hash 
+ * @param dataset - the original dataset to be checked with 
  * @param proofs 
  * @returns 
  */
-export async function verifyProofGraphs(report: Errors, hash: string, proofs: ProofStore[]): Promise<boolean> {
+export async function verifyProofGraphs(report: Errors, dataset: rdf.DatasetCore, proofs: ProofStore[]): Promise<boolean> {
     const allErrors: Errors[] = [];
     // deno-lint-ignore require-await
     const singleVerification = async (pr: ProofStore): Promise<boolean> => {
         const singleReport: Errors = { errors: [], warnings: [] }
         allErrors.push(singleReport);
-        return verifyAProofGraph(singleReport, hash, pr.proofQuads, pr.proofGraph);
+        return verifyAProofGraph(singleReport, dataset, pr.proofQuads, pr.proofGraph);
     }
 
     const promises: Promise<boolean>[] = proofs.map(singleVerification);
