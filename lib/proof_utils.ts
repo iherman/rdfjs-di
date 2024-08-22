@@ -205,7 +205,26 @@ async function verifyAProofGraph(report: Errors, dataset: rdf.DatasetCore, proof
     const localErrors   : types.ProblemDetail[] = [];
     const localWarnings : types.ProblemDetail[] = [];
 
-    const getProofValue = (store: n3.Store): string | null => {
+    // Check the "proofPurpose" property value; raise errors if it is problematic
+    {
+        const purposes: rdf.Quad[] = proof.getQuads(null, sec_proofPurpose, null, null);
+        if (purposes.length === 0) {
+            localErrors.push(new types.Invalid_Verification_Method("No proof purpose set"));
+        } else {
+            const wrongPurposes: string[] = [];
+            for (const q of purposes) {
+                if (!(q.object.equals(sec_authenticationMethod) || q.object.equals(sec_assertionMethod))) {
+                    wrongPurposes.push(`<${q.object.value}>`);
+                }
+            }
+            if (wrongPurposes.length > 0) {
+                localErrors.push(new types.Proof_Transformation_Error(`Invalid proof purpose value(s): ${wrongPurposes.join(", ")}`));
+            }
+        }
+    };
+
+    // Retrieve the proof value
+    const proofValue: string | null = ((store: n3.Store): string | null => {
         // Retrieve the signature value per spec:
         const proof_values: rdf.Quad[] = store.getQuads(null, sec_proofValue, null, null);
         if (proof_values.length === 0) {
@@ -215,9 +234,10 @@ async function verifyAProofGraph(report: Errors, dataset: rdf.DatasetCore, proof
             localErrors.push(new types.Proof_Verification_Error("Several proof values"));
         }
         return proof_values[0].object.value;
-    };
+    })(proof);
 
-    const getPublicKey = (store: n3.Store): JsonWebKey | null => {
+    // retrieve the public key from the graph
+    const publicKey: JsonWebKey | null = ((store: n3.Store): JsonWebKey | null => {
         // first see if the verificationMethod has been set properly
         const verificationMethod: rdf.Quad[] = store.getQuads(null, sec_verificationMethod, null, null);
         if (verificationMethod.length === 0) {
@@ -292,30 +312,9 @@ async function verifyAProofGraph(report: Errors, dataset: rdf.DatasetCore, proof
             localErrors.push(new types.Invalid_Verification_Method("More than one JWK encoded keys"));
             return null;
         }
-    };
+    })(proof);
 
-    // Check the "proofPurpose" property value
-    const checkProofPurposes = (store: n3.Store): void => {
-        const purposes: rdf.Quad[] = store.getQuads(null, sec_proofPurpose, null, null);
-        if (purposes.length === 0) {
-            localErrors.push(new types.Invalid_Verification_Method("No proof purpose set"))
-        } else {
-            const wrongPurposes: string[] = [];
-            for (const q of purposes) {
-                if (!(q.object.equals(sec_authenticationMethod) || q.object.equals(sec_assertionMethod))) {
-                    wrongPurposes.push(`<${q.object.value}>`);
-                }
-            }
-            if (wrongPurposes.length > 0) {
-                localErrors.push(new types.Proof_Transformation_Error(`Invalid proof purpose value(s): ${wrongPurposes.join(", ")}`));
-            }
-        }
-    }
-
-    // Retrieve necessary values with checks
-    checkProofPurposes(proof);
-    const publicKey: JsonWebKey | null = getPublicKey(proof);
-    const proofValue: string | null = getProofValue(proof);
+    // Calculate the dataset hash, that should be used for verification
     const hash: string = await calculateDatasetHash(dataset, publicKey);
 
     // The final set of error/warning should be modified with the proof graph's ID, if applicable

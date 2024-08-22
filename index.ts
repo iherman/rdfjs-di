@@ -12,10 +12,10 @@ import * as n3    from 'n3';
 import * as types from './lib/types';
 import * as debug from './lib/debug';
 
-import { Errors, KeyData, VerificationResult, Cryptosuites } from './lib/types';
+import { Errors, KeyData, VerificationResult } from './lib/types';
 import { 
     isKeyData, 
-    isDatasetCore, convertToStore, copyToStore, refactorBnodes, extraChainQuads,
+    isDatasetCore, convertToStore, refactorBnodes, extraChainQuads,
     DatasetMap, Proof, ProofStore, calculateDatasetHash
 } from './lib/utils';
 import { 
@@ -33,7 +33,7 @@ export { Cryptosuites }                                  from './lib/types';
 export { generateKey }                                   from './lib/crypto_utils';
 
 // n3.DataFactory is a namespace with some functions...
-const { quad, namedNode } = n3.DataFactory;
+const { quad } = n3.DataFactory;
 
 /**
  * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in 
@@ -43,7 +43,7 @@ const { quad, namedNode } = n3.DataFactory;
  * 
  * @param dataset 
  * @param keyData 
- * @param previous - A previous proof ID, when applicable
+ * @param previous - A previous proof ID, when applicable; this is added as an extra statement in the proof graphs. This parameter is only relevant internally, when a proof chain is generated.
  * @throws - Error if there was an issue while signing.
  * @returns 
  */
@@ -209,6 +209,7 @@ export async function embedProofGraph(dataset: rdf.DatasetCore, keyData: KeyData
     }
 
     // Merge all generated proof datasets into the result
+    // The reference to the proof graph(s) from the dedicated anchor is added to the result
     for (const proof of allProofs) {
         if (anchor) {
             output.add(quad(anchor, sec_proof, proof.proofGraph as rdf.Quad_Object))
