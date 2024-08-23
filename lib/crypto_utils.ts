@@ -13,10 +13,10 @@
  */
 
 import * as types from "./types";
-import { KeyMetadata, KeyData, Cryptosuites, KeyPair, Errors } from './types';
+import { KeyMetadata, KeyData, Cryptosuites, Errors } from './types';
 
-/** JWK values for the algorithms that are relevant for this package */
-export type Alg = "RS256" | "RS384" | "PS256" | "PS384";
+/** JWK values for the RSA algorithms that are relevant for this package */
+type Alg = "RS256" | "RS384" | "PS256" | "PS384";
 
 /** JWK values for the elliptic curves that are relevant for this package */
 export type Crv = "P-256" | "P-384";
@@ -25,7 +25,7 @@ export type Crv = "P-256" | "P-384";
 export type Hsh = "SHA-256" | "SHA-384";
 
 /** JWK values for the key types that are relevant for this package */
-export type Kty = "EC" | "RSA" | "OKP";
+type Kty = "EC" | "RSA" | "OKP";
 
 /** 
  * Interface to the Web Crypto information that has to be provided for the
@@ -106,7 +106,7 @@ function algorithmDataJWK(key: JsonWebKey): WebCryptoAPIData | null {
  * @param key 
  * @returns 
  */
-export function algorithmDataCR(report: Errors, key: CryptoKey): WebCryptoAPIData | null {
+function algorithmDataCR(report: Errors, key: CryptoKey): WebCryptoAPIData | null {
     const alg = key.algorithm;
     switch (alg.name) {
         case "RSA-PSS": {
@@ -129,23 +129,6 @@ export function algorithmDataCR(report: Errors, key: CryptoKey): WebCryptoAPIDat
             };
         }
     }
-}
-
-/**
- * Export a WebCrypto crypto key into its JWK equivalent.
- * 
- * @param newPair 
- * @returns 
- */
-export async function toJWK(crKey: CryptoKey): Promise<JsonWebKey> {
-    const jwkKey: JsonWebKey = await crypto.subtle.exportKey("jwk", crKey);
-    return jwkKey;
-}
-
-// @@@@@@@@ Errors
-export async function jwkToCrypto(report: Errors, jwkKey: JsonWebKey): Promise<CryptoKey> {
-    const algorithm = algorithmDataJWK(jwkKey);
-    return await crypto.subtle.importKey("jwk", jwkKey, algorithm, true, ["verify"]);
 }
 
 /***********************************************************************************
@@ -221,27 +204,43 @@ function base64UrlToArrayBuffer(url: string): ArrayBuffer {
 ***********************************************************************************/
 
 /**
+ * Convert a JWK key into WebCrypto; a thin layer on top of WebCrypto, which gathers
+ * the right algorithmic details needed for the import itself.
+ * 
+ * This function is also useful to the end user, so it is also meant to be
+ * re-exported via the `index.ts` module.
+ * 
+ * @param jwkKey 
+ * @param privateKey - whether this is a private or public key
+ * @returns 
+ */
+export async function jwkToCrypto(jwkKey: JsonWebKey, privateKey: boolean = false): Promise<CryptoKey> {
+    const algorithm = algorithmDataJWK(jwkKey);
+    return await crypto.subtle.importKey("jwk", jwkKey, algorithm, true, privateKey ? ["sign"] : ["verify"]);
+}
+
+/**
  * Sign a message.
  * 
  * Possible errors are added to the report, no exceptions should be thrown.
  * 
  * @param report 
  * @param message 
- * @param secretKey 
+ * @param privateKey 
  * @returns - either the signature in Multicode format, or `null` in case of an error.
  */
-export async function sign(report: Errors, message: string, secretKey: CryptoKey) : Promise<string | null> {
+export async function sign(report: Errors, message: string, privateKey: CryptoKey) : Promise<string | null> {
     // Prepare the message to signature:
     const rawMessage: ArrayBuffer = textToArrayBuffer(message);
 
     // The crypto algorithm to be used with this key:
-    const algorithm: WebCryptoAPIData | null = algorithmDataCR(report, secretKey);
+    const algorithm: WebCryptoAPIData | null = algorithmDataCR(report, privateKey);
 
     if (algorithm === null) {
         return null;
     } else {
         try {
-            const rawSignature: ArrayBuffer = await crypto.subtle.sign(algorithm, secretKey, rawMessage);
+            const rawSignature: ArrayBuffer = await crypto.subtle.sign(algorithm, privateKey, rawMessage);
             // Turn the the signature into Base64URL, and then into multicode
             return `u${arrayBufferToBase64Url(rawSignature)}`;
         } catch(e) {
@@ -319,12 +318,12 @@ export function cryptosuiteId(report: Errors, keyPair: CryptoKeyPair): Cryptosui
  * functionalities of the package, but may be useful for the package users. It is therefore 
  * meant to be re-exported via the `index.ts` module.
  * 
- * @param metadata 
  * @param suite 
  * @param keyData 
+ * @param metadata 
  * @returns 
  */
-export async function generateKey(suite: Cryptosuites, metadata?: KeyMetadata, keyData?: KeyDetails): Promise<KeyData> {
+export async function generateKey(suite: Cryptosuites, keyData?: KeyDetails, metadata?: KeyMetadata): Promise<KeyData> {
     const suiteToAPI = (): any => {
         switch(suite) {
             case Cryptosuites.ecdsa : return {
@@ -350,11 +349,10 @@ export async function generateKey(suite: Cryptosuites, metadata?: KeyMetadata, k
     }
 
     const newPair: CryptoKeyPair = await crypto.subtle.generateKey(suiteToAPI(), true, ["sign", "verify"]);
-    const retval: KeyData = {
+    const output: KeyData = {
         publicKey   : newPair.publicKey,
         privateKey  : newPair.privateKey,
-        cryptosuite : `${suite}`,
     }
-    return {...retval, ...metadata};
+    return {...output, ...metadata};
 }
 

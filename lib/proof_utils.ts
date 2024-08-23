@@ -94,7 +94,7 @@ async function calculateProofOptionsHash(proofGraph: rdf.DatasetCore, key: Crypt
  * @returns 
  */
 export async function generateAProofGraph(report: Errors, hashValue: string, keyData: KeyData, previousProof ?: rdf.Quad_Subject): Promise <rdf.DatasetCore> {
-    const cryptosuite = keyData?.cryptosuite || cryptosuiteId(report, keyData)
+    const cryptosuite = cryptosuiteId(report, keyData)
     /* @@@@@ */ debug.log(`Generating a proof graph with ${cryptosuite}`);
 
     // Generate the key data to be stored in the proof graph; either multikey or jwk, depending on the cryptosuite
@@ -300,9 +300,15 @@ async function verifyAProofGraph(report: Errors, dataset: rdf.DatasetCore, proof
             // We have a JWK key, we can return it if it parses o.k.
             try {
                 const jwk: JsonWebKey = JSON.parse(keys_jwk[0].object.value) as JsonWebKey;
-                return await jwkToCrypto(report, jwk);
+                try {
+                    return await jwkToCrypto(jwk);
+                } catch(e) {
+                    // This happens if there is a problem with the crypto import did not work out
+                    localWarnings.push(new types.Proof_Verification_Error(`JWK could not be imported into crypto: ${e.message}`));
+                    return null;
+                }
             } catch (e) {
-                // This happens if there is a JSON parse error with the key...
+                // This happens if there is a JSON parse error with the key
                 localWarnings.push(new types.Proof_Verification_Error(`Parsing error for JWK: ${e.message}`));
                 return null;
             }

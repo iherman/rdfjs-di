@@ -13,7 +13,7 @@
 import { RDFC10 }               from 'rdfjs-c14n';
 import * as rdf                 from '@rdfjs/types';
 import * as n3                  from 'n3';
-import { KeyPair, KeyMetadata } from './types';
+import { KeyMetadata } from './types';
 import * as debug               from './debug';
 
 const { namedNode, quad } = n3.DataFactory;

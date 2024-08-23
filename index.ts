@@ -12,7 +12,7 @@ import * as n3    from 'n3';
 import * as types from './lib/types';
 import * as debug from './lib/debug';
 
-import { Errors, KeyData, VerificationResult } from './lib/types';
+import { Errors, KeyData, VerificationResult, KeyMetadata } from './lib/types';
 import { 
     isKeyData, 
     isDatasetCore, convertToStore, refactorBnodes, extraChainQuads,
@@ -30,20 +30,20 @@ import {
 export type { KeyData, VerificationResult, KeyMetadata } from './lib/types';
 export type { KeyDetails }                               from './lib/crypto_utils';
 export { Cryptosuites }                                  from './lib/types';
-export { generateKey }                                   from './lib/crypto_utils';
+export { generateKey, jwkToCrypto }                      from './lib/crypto_utils';
 
 // n3.DataFactory is a namespace with some functions...
 const { quad } = n3.DataFactory;
 
 /**
  * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in 
- * multibase format, using base64url encoding. Keys are accepted in JWK format (and stored in JWK or in Multikey, depending on the crypto key).
+ * multibase format, using base64url encoding. Keys are accepted in WebCrypto Key format (and stored in JWK or in Multikey, depending on the crypto key).
  * 
  * A single previous proof reference may also be set, although that really makes sense in the case of a single key only
  * 
  * @param dataset 
  * @param keyData 
- * @param previous - A previous proof ID, when applicable; this is added as an extra statement in the proof graphs. This parameter is only relevant internally, when a proof chain is generated.
+ * @param previous - A previous proof ID, when applicable; this is added as an extra statement in the proof graphs. This parameter is only relevant internally when a proof chain is generated.
  * @throws - Error if there was an issue while signing.
  * @returns 
  */

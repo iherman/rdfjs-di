@@ -1,11 +1,10 @@
-import { canonify }     from '@truestamp/canonify';
-import * as fs          from 'node:fs/promises';
-import { KeyData }   from '../../index';
-
+import { canonify } from '@truestamp/canonify';
+import * as fs      from 'node:fs/promises';
+import { KeyData, jwkToCrypto }  from '../../index';
 
 interface KeyPair {
-    public: JsonWebKey,
-    private: JsonWebKey,
+    publicKey: JsonWebKey,
+    privateKey: JsonWebKey,
 }
 
 interface KeyMetadata {
@@ -14,40 +13,7 @@ interface KeyMetadata {
     revoked?: string,
     cryptosuite?: string,
 }
-
 interface jwkKeyData extends KeyMetadata, KeyPair {};
-
-const RsaAlgs: Record<string, any> = {
-    "PS256": { name: 'RSA-PSS', hash: 'SHA-256', saltLength: 32 },
-    "PS384": { name: 'RSA-PSS', hash: 'SHA-384', saltLength: 32 },
-    "RS256": { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    "RS384": { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384' },
-}
-
-function algorithmDataJWK(key: JsonWebKey): any | null {
-    switch (key.kty) {
-        case "RSA": {
-            try {
-                return RsaAlgs[key.alg ?? ""]; // this will generate an exception, but it is caught below.
-            } catch (e) {
-                throw new Error(`Key's error in 'alg': ${e.message}`);
-            }
-        }
-        case "EC": {
-            return {
-                name: "ECDSA",
-                namedCurve: key.crv,
-                hash: (key.crv) === "P-256" ? "SHA-256" : "SHA-384",
-            };
-        }
-        case "OKP": default: {
-            return {
-                name: "Ed25519"
-            };
-        }
-    }
-}
-
 
 export async function get_keys(): Promise<KeyData[]> {
     const raw_keys: string = await fs.readFile('testing/keys.json', 'utf-8');
@@ -55,10 +21,8 @@ export async function get_keys(): Promise<KeyData[]> {
     const output: KeyData[] = [];
 
     for (const key of jwkKeyData) {
-        const jwkKey: JsonWebKey = key.public;
-        const algorithm = algorithmDataJWK(jwkKey);
-        const publ = await crypto.subtle.importKey("jwk", jwkKey, algorithm, true, ["verify"]);
-        const secr = await crypto.subtle.importKey("jwk", key.private, algorithm, true, ["sign"]);
+        const publ: CryptoKey = await jwkToCrypto(key.publicKey);
+        const secr: CryptoKey = await jwkToCrypto(key.privateKey, true)
         const newItem: KeyData = {
             publicKey: publ,
             privateKey: secr,
@@ -66,7 +30,6 @@ export async function get_keys(): Promise<KeyData[]> {
         if (key.controller)  newItem.controller = key.controller;
         if (key.expires)     newItem.expires = key.expires;
         if (key.revoked)     newItem.revoked = key.revoked;
-        if (key.cryptosuite) newItem.cryptosuite = key.cryptosuite;
         output.push(newItem)
     }
     return output;
