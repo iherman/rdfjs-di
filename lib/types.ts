@@ -30,7 +30,8 @@ export interface KeyMetadata {
     cryptosuite?: string,
 }
 
-export interface KeyData extends KeyMetadata, KeyPair {}
+// export interface KeyData extends KeyMetadata, KeyPair {}
+export interface KeyData extends KeyMetadata, CryptoKeyPair { }
 
 /*****************************************************************************************
  * Errors

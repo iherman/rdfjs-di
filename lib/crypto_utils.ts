@@ -16,13 +16,13 @@ import * as types from "./types";
 import { KeyMetadata, KeyData, Cryptosuites, KeyPair, Errors } from './types';
 
 /** JWK values for the algorithms that are relevant for this package */
-export type Alg = "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512";
+export type Alg = "RS256" | "RS384" | "PS256" | "PS384";
 
 /** JWK values for the elliptic curves that are relevant for this package */
-export type Crv = "P-256" | "P-384" | "P-521";
+export type Crv = "P-256" | "P-384";
 
 /** JWK values for the hash methods that are relevant for this package */
-export type Hsh = "SHA-256" | "SHA-384" | "SHA-512";
+export type Hsh = "SHA-256" | "SHA-384";
 
 /** JWK values for the key types that are relevant for this package */
 export type Kty = "EC" | "RSA" | "OKP";
@@ -64,10 +64,8 @@ const DEFAULT_CURVE           = "P-256";
 const RsaAlgs: Record<Alg, WebCryptoAPIData> = {
     "PS256": { name: 'RSA-PSS', hash: 'SHA-256', saltLength: SALT_LENGTH },
     "PS384": { name: 'RSA-PSS', hash: 'SHA-384', saltLength: SALT_LENGTH },
-    "PS512": { name: 'RSA-PSS', hash: 'SHA-512', saltLength: SALT_LENGTH },
     "RS256": { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
     "RS384": { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384' },
-    "RS512": { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' },
 }
 
 /**
@@ -77,14 +75,13 @@ const RsaAlgs: Record<Alg, WebCryptoAPIData> = {
  * @param key 
  * @returns 
  */
-export function algorithmData(report: Errors, key: JsonWebKey): WebCryptoAPIData | null {
+function algorithmDataJWK(key: JsonWebKey): WebCryptoAPIData | null {
     switch (key.kty as Kty) {
         case "RSA" : {
             try {
                 return RsaAlgs[key.alg as Alg];
             } catch (e) {
-                report.errors.push(new types.Unclassified_Error(`Key's error in 'alg': ${e.message}`));
-                return null;
+                throw new Error(`Key's error in 'alg': ${e.message}`);
             }
         }
         case "EC": {
@@ -103,15 +100,52 @@ export function algorithmData(report: Errors, key: JsonWebKey): WebCryptoAPIData
 }
 
 /**
- * Export a WebCrypto crypto key pair into their JWK equivalent.
+ * Mapping of the CryptoKey instance and the corresponding terms for the WebCrypto API.
+ * 
+ * @param report 
+ * @param key 
+ * @returns 
+ */
+export function algorithmDataCR(report: Errors, key: CryptoKey): WebCryptoAPIData | null {
+    const alg = key.algorithm;
+    switch (alg.name) {
+        case "RSA-PSS": {
+            return { name: 'RSA-PSS', hash: 'SHA-256', saltLength: SALT_LENGTH }
+        }
+        case "RSASSA-PKCS1-v1_5": {
+            return { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }
+        }
+        case "ECDSA": {
+            const curve = (alg as EcKeyAlgorithm).namedCurve as Crv;
+            return {
+                name:       "ECDSA",
+                namedCurve: curve,
+                hash:       curve === "P-384" ? "SHA-384" : "SHA-256",
+            };
+        }
+        case "Ed25519": default: {
+            return {
+                name: "Ed25519"
+            };
+        }
+    }
+}
+
+/**
+ * Export a WebCrypto crypto key into its JWK equivalent.
  * 
  * @param newPair 
  * @returns 
  */
-async function toJWK(newPair: CryptoKeyPair): Promise<KeyPair> {
-    const publicKey: JsonWebKey = await crypto.subtle.exportKey("jwk", newPair.publicKey);
-    const privateKey: JsonWebKey = await crypto.subtle.exportKey("jwk", newPair.privateKey);
-    return { public: publicKey, private: privateKey };
+export async function toJWK(crKey: CryptoKey): Promise<JsonWebKey> {
+    const jwkKey: JsonWebKey = await crypto.subtle.exportKey("jwk", crKey);
+    return jwkKey;
+}
+
+// @@@@@@@@ Errors
+export async function jwkToCrypto(report: Errors, jwkKey: JsonWebKey): Promise<CryptoKey> {
+    const algorithm = algorithmDataJWK(jwkKey);
+    return await crypto.subtle.importKey("jwk", jwkKey, algorithm, true, ["verify"]);
 }
 
 /***********************************************************************************
@@ -196,21 +230,18 @@ function base64UrlToArrayBuffer(url: string): ArrayBuffer {
  * @param secretKey 
  * @returns - either the signature in Multicode format, or `null` in case of an error.
  */
-export async function sign(report: Errors, message: string, secretKey: JsonWebKey) : Promise<string | null> {
+export async function sign(report: Errors, message: string, secretKey: CryptoKey) : Promise<string | null> {
     // Prepare the message to signature:
     const rawMessage: ArrayBuffer = textToArrayBuffer(message);
 
     // The crypto algorithm to be used with this key:
-    const algorithm: WebCryptoAPIData | null = algorithmData(report, secretKey);
+    const algorithm: WebCryptoAPIData | null = algorithmDataCR(report, secretKey);
 
     if (algorithm === null) {
         return null;
     } else {
         try {
-            // Import the JWK key into crypto key:
-            const key: CryptoKey = await crypto.subtle.importKey("jwk", secretKey, algorithm, true, ["sign"]);
-            const rawSignature: ArrayBuffer = await crypto.subtle.sign(algorithm, key, rawMessage);
-            
+            const rawSignature: ArrayBuffer = await crypto.subtle.sign(algorithm, secretKey, rawMessage);
             // Turn the the signature into Base64URL, and then into multicode
             return `u${arrayBufferToBase64Url(rawSignature)}`;
         } catch(e) {
@@ -231,7 +262,7 @@ export async function sign(report: Errors, message: string, secretKey: JsonWebKe
  * @param publicKey 
  * @returns 
  */
-export async function verify(report: Errors, message: string, signature: string, publicKey: JsonWebKey): Promise<boolean> {
+export async function verify(report: Errors, message: string, signature: string, publicKey: CryptoKey): Promise<boolean> {
     const rawMessage: ArrayBuffer = textToArrayBuffer(message);
     if (signature.length === 0 || signature[0] !== 'u') {
         report.errors.push(new types.Proof_Verification_Error(`Signature is of an incorrect format (${signature})`));
@@ -239,15 +270,14 @@ export async function verify(report: Errors, message: string, signature: string,
     }
     const rawSignature: ArrayBuffer = base64UrlToArrayBuffer(signature.slice(1));
 
-    // get the keys:
-    const algorithm: WebCryptoAPIData | null = algorithmData(report, publicKey);
+    // get the algorithm details
+    const algorithm: WebCryptoAPIData | null = algorithmDataCR(report, publicKey);
 
     if (algorithm === null) {
         return false;
     } else {
         try {
-            const key: CryptoKey = await crypto.subtle.importKey("jwk", publicKey, algorithm, true, ["verify"]);
-            const retval: boolean = await crypto.subtle.verify(algorithm, key, rawSignature, rawMessage);
+            const retval: boolean = await crypto.subtle.verify(algorithm, publicKey, rawSignature, rawMessage);
             if (retval === false) {
                 report.errors.push(new types.Proof_Verification_Error(`Signature ${signature} is invalid`));
             }
@@ -260,32 +290,24 @@ export async function verify(report: Errors, message: string, signature: string,
 }
 
 /**
- * Mapping from the JWK data to the corresponding DI cryptosuite identifier.
+ * Mapping from the Crypto Key data to the corresponding DI cryptosuite identifier.
  * 
  * @param report - placeholder for error reports
  * @param keyPair 
  * @returns 
  */
-export function cryptosuiteId(report: Errors, keyPair: KeyPair): Cryptosuites | null {
-    // Some elementary check
-    if (keyPair.private.kty !== keyPair.public.kty ||
-        keyPair.private.crv !== keyPair.public.crv ||
-        keyPair.private.alg !== keyPair.private.alg) {
-        report.errors.push(new types.Invalid_Verification_Method('Keys are not in pair (in:\n ${JSON.stringify(keyPair,null,4)})'));
-        return null;
-    }
-
-    const alg = algorithmData(report, keyPair.public);
+export function cryptosuiteId(report: Errors, keyPair: CryptoKeyPair): Cryptosuites | null {
+    const alg = keyPair.publicKey.algorithm;
     if (alg === null) {
         return null;
     } else {
         switch (alg.name) {
-            case "ECDSA": return Cryptosuites.ecdsa;
-            case "Ed25519": return Cryptosuites.eddsa;
-            case "RSA-PSS": return Cryptosuites.rsa_pss;
+            case "ECDSA":             return Cryptosuites.ecdsa;
+            case "Ed25519":           return Cryptosuites.eddsa;
+            case "RSA-PSS":           return Cryptosuites.rsa_pss;
             case "RSASSA-PKCS1-v1_5": return Cryptosuites.rsa_ssa;
             default: {
-                report.errors.push(new types.Invalid_Verification_Method(`Unknown alg (${alg.name} in:\n ${JSON.stringify(keyPair,null,4)})`));
+                report.errors.push(new types.Invalid_Verification_Method(`Invalid algorithm name (${alg.name})`));
                 return null;
             }
         }
@@ -327,12 +349,12 @@ export async function generateKey(suite: Cryptosuites, metadata?: KeyMetadata, k
         }
     }
 
-    const newPair = await crypto.subtle.generateKey(suiteToAPI(), true, ["sign", "verify"]);
-    const keyPair = await toJWK(newPair);
+    const newPair: CryptoKeyPair = await crypto.subtle.generateKey(suiteToAPI(), true, ["sign", "verify"]);
     const retval: KeyData = {
-        public      : keyPair.public,
-        private     : keyPair.private,
+        publicKey   : newPair.publicKey,
+        privateKey  : newPair.privateKey,
         cryptosuite : `${suite}`,
     }
     return {...retval, ...metadata};
 }
+

@@ -56,12 +56,13 @@ export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyD
     // This is not optimal. It will regenerate the hash for every key and, except for an occasional ECDSA+P-384, it will generate the same data. 
     // Some sort of a caching information on the hash values could replace this, but that is left for later...
     const signAndGenerate = async (keypair: KeyData): Promise<rdf.DatasetCore> => {
-        const toBeSigned = await calculateDatasetHash(dataset, keypair.public);
+        const toBeSigned = await calculateDatasetHash(dataset, keypair.publicKey);
         return generateAProofGraph(report, toBeSigned, keypair, previous);
     }
 
     // prepare for the overload of arguments
     const keyPairs: Iterable<KeyData> = isKeyData(keyData) ? [keyData] : keyData;
+
     // execute the proof graph generation concurrently
     const promises: Promise<rdf.DatasetCore>[] = Array.from(keyPairs).map(signAndGenerate);
     const retval: rdf.DatasetCore[] = await Promise.all(promises);

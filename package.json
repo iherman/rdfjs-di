@@ -7,6 +7,7 @@
   "scripts": {
     "test": "./node_modules/.bin/ts-node testing/run/main.ts",
     "crkey": "./node_modules/.bin/ts-node testing/run/createKeys.ts",
+    "crypto": "./node_modules/.bin/ts-node testing/run/testCrypto.ts",
     "docs": "./node_modules/.bin/typedoc index.ts lib/*",
     "dist": "tsc -d"
   },

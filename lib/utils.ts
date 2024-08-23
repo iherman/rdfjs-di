@@ -238,14 +238,14 @@ export function isDatasetCore(obj: any): obj is rdf.DatasetCore {
 
 
 /**
- * Type guard to check if an object implements the KeyPair interface.
+ * Type guard to check if an object implements the CryptoKeyPair interface.
  * 
  * @param obj 
  * @returns 
  */
 // deno-lint-ignore no-explicit-any
-export function isKeyData(obj: any): obj is KeyMetadata {
-    return (obj as KeyPair).public !== undefined && (obj as KeyPair).private !== undefined;
+export function isKeyData(obj: any): obj is CryptoKeyPair {
+    return (obj as CryptoKeyPair).publicKey !== undefined && (obj as CryptoKeyPair).privateKey !== undefined;
 }
 
 /**
@@ -260,11 +260,14 @@ export function isKeyData(obj: any): obj is KeyMetadata {
  * @param key - to decide whether SHA-384 should be used instead of the (default) SHA-256
  * @returns 
  */
-export async function calculateDatasetHash(dataset: rdf.DatasetCore, key ?: JsonWebKey): Promise<string> {
+export async function calculateDatasetHash(dataset: rdf.DatasetCore, key ?: CryptoKey): Promise<string> {
     const rdfc10 = new RDFC10();
-    if (key && key?.kty === "EC" && key?.crv === "P-384") {
+
+    // Per cryptosuite specification if ECDSA+P-384 is used, the whole world should use SHA-384...
+    if (key.algorithm.name === "ECDSA" && (key.algorithm as EcKeyAlgorithm)?.namedCurve === "P-384") {
         rdfc10.hash_algorithm = "sha384";
     }
+
     const canonical_quads: string = await rdfc10.canonicalize(dataset);
     const datasetHash: string = await rdfc10.hash(canonical_quads);
     return datasetHash;
