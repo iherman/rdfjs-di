@@ -190,24 +190,34 @@ function isDatasetCore(obj) {
 }
 exports.isDatasetCore = isDatasetCore;
 /**
- * Type guard to check if an object implements the KeyPair interface.
+ * Type guard to check if an object implements the CryptoKeyPair interface.
  *
  * @param obj
  * @returns
  */
 // deno-lint-ignore no-explicit-any
 function isKeyData(obj) {
-    return obj.public !== undefined && obj.private !== undefined;
+    return obj.publicKey !== undefined && obj.privateKey !== undefined;
 }
 exports.isKeyData = isKeyData;
 /**
  * Calculate the canonical hash of a dataset using the implementation of RDFC 1.0.
  *
+ * Note that the hash calculation's detail depend on the crypto key being used.
+ * If the key belongs to an ECDSA key, and the corresponding curve is P-384, then
+ * SHA-384 must be used by the algorithm. Hence the presence of the second
+ * argument in the call.
+ *
  * @param dataset
+ * @param key - to decide whether SHA-384 should be used instead of the (default) SHA-256
  * @returns
  */
-async function calculateDatasetHash(dataset) {
+async function calculateDatasetHash(dataset, key) {
     const rdfc10 = new rdfjs_c14n_1.RDFC10();
+    // Per cryptosuite specification if ECDSA+P-384 is used, the whole world should use SHA-384...
+    if (key.algorithm.name === "ECDSA" && key.algorithm?.namedCurve === "P-384") {
+        rdfc10.hash_algorithm = "sha384";
+    }
     const canonical_quads = await rdfc10.canonicalize(dataset);
     const datasetHash = await rdfc10.hash(canonical_quads);
     return datasetHash;

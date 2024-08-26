@@ -59,7 +59,13 @@ For more details, see:
 
 ```typescript
 import * as rdf from '@rdfjs/types';
-import { KeyData, generateProofGraph, VerificationResult, generateKey } from 'rdfjs-di';
+import { 
+    KeyData, 
+    generateProofGraph, verifyProofGraph, 
+    embedProofGraph, verifyEmbeddedProofGraph,
+    VerificationResult, 
+    generateKey 
+} from 'rdfjs-di';
 
 const dataset: rdf.DatasetCore = generateYourDataset();
 

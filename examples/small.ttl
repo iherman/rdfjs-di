@@ -5,6 +5,7 @@
 @prefix doap: <http://usefulinc.com/ns/doap#> .
 @prefix earl: <http://www.w3.org/ns/earl#> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix sec:  <https://w3id.org/security#>.
 
 <file:///small.ttl> foaf:primaryTopic <https://iherman.github.io/rdfjs-c14n/> ;
   dc:issued  "2024-02-14T13:21:08.700Z"^^xsd:dateTime ;
@@ -43,3 +44,4 @@
   foaf:name     "Ivan Herman";
   foaf:title    "Implementor";
   foaf:homepage <https://www.ivan-herman.net/> .
+

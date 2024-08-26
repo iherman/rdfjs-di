@@ -6,11 +6,9 @@ import * as process from 'node:process';
 import { KeyData, VerificationResult, 
     generateProofGraph, verifyProofGraph, 
     embedProofGraph, verifyEmbeddedProofGraph,
-    generateKey
 } from '../../index';
 import { get_quads, DataFactory, write_quads }  from './rdfn3';
 import { get_keys, OSet }                       from './keys';
-import { Cryptosuites } from '../../lib/types';
 
 function displayVerificationResult(result: VerificationResult): void {
     console.log(`>>>> Verification result`);
@@ -34,6 +32,17 @@ function displayVerificationResult(result: VerificationResult): void {
     console.log('')
 }
 
+/**
+ * The test can be used to
+ * - generate one or several proof graphs
+ * - generate one or several embedded proofs, both as proof sets or proof chains
+ * - validate all of the above
+ * 
+ * Note: the keys are stored in the separate "keys.json" files. It contains different keys; if a single
+ * graph is used by the test, it will pick the first key, otherwise it picks all of them.
+ * 
+ * The keys include both public and private keys, so they should be used for debug purposes only!
+ */
 async function main() {
     const program = new Command();
     program
