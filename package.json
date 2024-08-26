@@ -38,6 +38,7 @@
     "@truestamp/canonify": "^2.1.0",
     "base58-universal": "^2.0.0",
     "base64url": "^3.0.1",
+    "multikey-webcrypto": "^0.5.0",
     "n3": "^1.17.2",
     "rdfjs-c14n": "^3.1.0",
     "uuid": "^9.0.1"

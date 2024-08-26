@@ -14,7 +14,7 @@ import * as rdf       from '@rdfjs/types';
 import * as n3        from 'n3';
 import { v4 as uuid } from 'uuid';
 import { canonify }   from '@truestamp/canonify';
-import * as mkwc      from "../../../VC/multikey-webcrypto";
+import * as mkwc      from 'multikey-webcrypto';
 
 import * as types                                          from './types';
 import { Errors, KeyData }                                 from './types';
