@@ -7,15 +7,15 @@
 
 // deno-lint-ignore-file no-inferrable-types
 /// <reference types="node" />
-import * as rdf          from '@rdfjs/types';
-import * as n3           from 'n3';
-import * as types        from './lib/types';
-import * as debug        from './lib/debug';
+import * as rdf   from '@rdfjs/types';
+import * as n3    from 'n3';
+import * as types from './lib/types';
+import * as debug from './lib/debug';
 
-import { Errors, KeyData, VerificationResult, Cryptosuites } from './lib/types';
+import { Errors, KeyData, VerificationResult, KeyMetadata } from './lib/types';
 import { 
     isKeyData, 
-    isDatasetCore, convertToStore, copyToStore, refactorBnodes, extraChainQuads,
+    isDatasetCore, convertToStore, refactorBnodes, extraChainQuads,
     DatasetMap, Proof, ProofStore, calculateDatasetHash
 } from './lib/utils';
 import { 
@@ -23,28 +23,27 @@ import {
     rdf_type, 
     sec_di_proof, 
     sec_proof, 
-    sec_prefix, 
     sec_previousProof
-}   from './lib/proof_utils';
+} from './lib/proof_utils';
 
-/* This file is also the "top level", so a number of exports are put here to be more friendly to users */
+/* This file is also the entry module to the package; a number of exports are put here to be more friendly to users */
 export type { KeyData, VerificationResult, KeyMetadata } from './lib/types';
 export type { KeyDetails }                               from './lib/crypto_utils';
-export { Cryptosuites}                                   from './lib/types';
-export { generateKey }                                   from './lib/crypto_utils';
+export { Cryptosuites }                                  from './lib/types';
+export { generateKey, jwkToCrypto }                      from './lib/crypto_utils';
 
 // n3.DataFactory is a namespace with some functions...
-const { quad, namedNode } = n3.DataFactory;
+const { quad } = n3.DataFactory;
 
 /**
  * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in 
- * multibase format, using base64url encoding. Keys are accepted in JWK format (and stored in JWK or in Multikey, depending on the crypto key).
+ * multibase format, using base64url encoding. Keys are accepted in WebCrypto Key format (and stored in JWK or in Multikey, depending on the crypto key).
  * 
  * A single previous proof reference may also be set, although that really makes sense in the case of a single key only
  * 
  * @param dataset 
  * @param keyData 
- * @param previous - A previous proof ID, when applicable
+ * @param previous - A previous proof ID, when applicable; this is added as an extra statement in the proof graphs. This parameter is only relevant internally when a proof chain is generated.
  * @throws - Error if there was an issue while signing.
  * @returns 
  */
@@ -54,13 +53,18 @@ export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyD
     // Start fresh with results
     const report: Errors = { errors : [], warnings : [] }
 
-    // This is to be signed
-    const toBeSigned = await calculateDatasetHash(dataset);
+    // This is not optimal. It will regenerate the hash for every key and, except for an occasional ECDSA+P-384, it will generate the same data. 
+    // Some sort of a caching information on the hash values could replace this, but that is left for later...
+    const signAndGenerate = async (keypair: KeyData): Promise<rdf.DatasetCore> => {
+        const toBeSigned = await calculateDatasetHash(dataset, keypair.publicKey);
+        return generateAProofGraph(report, toBeSigned, keypair, previous);
+    }
 
     // prepare for the overload of arguments
     const keyPairs: Iterable<KeyData> = isKeyData(keyData) ? [keyData] : keyData;
+
     // execute the proof graph generation concurrently
-    const promises: Promise<rdf.DatasetCore>[] = Array.from(keyPairs).map((keypair: KeyData) => generateAProofGraph(report, toBeSigned, keypair, previous));
+    const promises: Promise<rdf.DatasetCore>[] = Array.from(keyPairs).map(signAndGenerate);
     const retval: rdf.DatasetCore[] = await Promise.all(promises);
     // return by taking care of overloading.
     if (report.errors.length !== 0) {
@@ -94,8 +98,7 @@ export async function generateProofGraph(dataset: rdf.DatasetCore, keyData: KeyD
  * @returns 
  */
 export async function verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf.DatasetCore | rdf.DatasetCore[]): Promise<VerificationResult> {
-    const report: Errors = { errors: [], warnings: [] }    
-    const hash: string = await calculateDatasetHash(dataset);
+    const report: Errors = { errors: [], warnings: [] }
     const proofGraphs: rdf.DatasetCore[] = isDatasetCore(proofGraph) ? [proofGraph] : proofGraph;
     const proofs = proofGraphs.map((pr: rdf.DatasetCore): ProofStore => {
         return {
@@ -103,7 +106,7 @@ export async function verifyProofGraph(dataset: rdf.DatasetCore, proofGraph: rdf
             proofGraph: undefined,
         };
     });
-    const verified: boolean = await verifyProofGraphs(report, hash, proofs);
+    const verified: boolean = await verifyProofGraphs(report, dataset, proofs);
     
     return {
         verified,
@@ -207,6 +210,7 @@ export async function embedProofGraph(dataset: rdf.DatasetCore, keyData: KeyData
     }
 
     // Merge all generated proof datasets into the result
+    // The reference to the proof graph(s) from the dedicated anchor is added to the result
     for (const proof of allProofs) {
         if (anchor) {
             output.add(quad(anchor, sec_proof, proof.proofGraph as rdf.Quad_Object))
@@ -277,7 +281,7 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
     // By now, we got the identification of all the proof graphs, we can separate the quads into 
     // the "real" data graph and the relevant proof graphs
     for (const q of dataset) {
-        if (q.predicate.equals(sec_proof) && proofGraphs.has(q.graph)) {
+        if (q.predicate.equals(sec_proof) && proofGraphs.has(q.object)) {
             // this is an extra entry, not part of the triples that were signed
             // neither it is part of any proof graphs
             continue;
@@ -327,8 +331,7 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
                 // (This is an n3 specific API method!)
                 dataStore.addQuads(extraQuads);
 
-                const hash: string = await calculateDatasetHash(dataStore);
-                const verifiedChainLink: boolean = await verifyProofGraphs(report, hash, [allProofs[i]]);
+                const verifiedChainLink: boolean = await verifyProofGraphs(report, dataStore, [allProofs[i]]);
                 verified_list.push(verifiedChainLink);
 
                 dataStore.removeQuads(extraQuads);
@@ -345,9 +348,8 @@ export async function verifyEmbeddedProofGraph(dataset: rdf.DatasetCore, anchor?
     } else {
         // This is the simple case...
 
-        const hash: string = await calculateDatasetHash(dataStore);
         const proofs: ProofStore[] = proofGraphs.data();
-        const verified: boolean = await verifyProofGraphs(report, hash, proofs);
+        const verified: boolean = await verifyProofGraphs(report, dataStore, proofs);
         return {
             verified,
             verifiedDocument: verified ? dataStore : null,

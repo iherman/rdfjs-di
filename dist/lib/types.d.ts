@@ -14,17 +14,15 @@ export interface VerificationResult extends Errors {
     verified: boolean;
     verifiedDocument: rdf.DatasetCore | null;
 }
-export interface KeyPair {
-    public: JsonWebKey;
-    private: JsonWebKey;
-}
+/**
+ * Some additional meta data that can be stored with the keys, and then re-appear as part of the proof graphs
+ */
 export interface KeyMetadata {
     controller?: string;
     expires?: string;
     revoked?: string;
-    cryptosuite?: string;
 }
-export interface KeyData extends KeyMetadata, KeyPair {
+export interface KeyData extends KeyMetadata, CryptoKeyPair {
 }
 /*****************************************************************************************
  * Errors

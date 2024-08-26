@@ -10,11 +10,10 @@
  * 
  */
 
-import { RDFC10 }                            from 'rdfjs-c14n';
-import * as rdf                              from '@rdfjs/types';
-import * as n3                               from 'n3';
-import { KeyPair, KeyMetadata }              from './types';
-import * as debug                            from './debug';
+import { RDFC10 }               from 'rdfjs-c14n';
+import * as rdf                 from '@rdfjs/types';
+import * as n3                  from 'n3';
+import * as debug               from './debug';
 
 const { namedNode, quad } = n3.DataFactory;
 
@@ -238,24 +237,36 @@ export function isDatasetCore(obj: any): obj is rdf.DatasetCore {
 
 
 /**
- * Type guard to check if an object implements the KeyPair interface.
+ * Type guard to check if an object implements the CryptoKeyPair interface.
  * 
  * @param obj 
  * @returns 
  */
 // deno-lint-ignore no-explicit-any
-export function isKeyData(obj: any): obj is KeyMetadata {
-    return (obj as KeyPair).public !== undefined && (obj as KeyPair).private !== undefined;
+export function isKeyData(obj: any): obj is CryptoKeyPair {
+    return (obj as CryptoKeyPair).publicKey !== undefined && (obj as CryptoKeyPair).privateKey !== undefined;
 }
 
 /**
  * Calculate the canonical hash of a dataset using the implementation of RDFC 1.0.
  * 
+ * Note that the hash calculation's detail depend on the crypto key being used.
+ * If the key belongs to an ECDSA key, and the corresponding curve is P-384, then
+ * SHA-384 must be used by the algorithm. Hence the presence of the second
+ * argument in the call.
+ * 
  * @param dataset 
+ * @param key - to decide whether SHA-384 should be used instead of the (default) SHA-256
  * @returns 
  */
-export async function calculateDatasetHash(dataset: rdf.DatasetCore): Promise<string> {
+export async function calculateDatasetHash(dataset: rdf.DatasetCore, key ?: CryptoKey): Promise<string> {
     const rdfc10 = new RDFC10();
+
+    // Per cryptosuite specification if ECDSA+P-384 is used, the whole world should use SHA-384...
+    if (key.algorithm.name === "ECDSA" && (key.algorithm as EcKeyAlgorithm)?.namedCurve === "P-384") {
+        rdfc10.hash_algorithm = "sha384";
+    }
+
     const canonical_quads: string = await rdfc10.canonicalize(dataset);
     const datasetHash: string = await rdfc10.hash(canonical_quads);
     return datasetHash;

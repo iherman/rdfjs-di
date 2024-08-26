@@ -1,6 +1,6 @@
 {
     "RSA-PSS": {
-        "public": {
+        "publicKey": {
             "key_ops": [
                 "verify"
             ],
@@ -10,7 +10,7 @@
             "e": "AQAB",
             "alg": "PS256"
         },
-        "private": {
+        "privateKey": {
             "key_ops": [
                 "sign"
             ],
@@ -28,7 +28,7 @@
         }
     },
     "ECDSA": {
-        "public": {
+        "publicKey": {
             "key_ops": [
                 "verify"
             ],
@@ -38,7 +38,7 @@
             "y": "j8bbdzJcCBOIcWTEnt5LEs4c4g3oRuGMtYJAkpiX10A",
             "crv": "P-256"
         },
-        "private": {
+        "privateKey": {
             "key_ops": [
                 "sign"
             ],
@@ -51,7 +51,7 @@
         }
     },
     "RSASSA": {
-        "public": {
+        "publicKey": {
             "key_ops": [
                 "verify"
             ],
@@ -61,7 +61,7 @@
             "e": "AQAB",
             "alg": "RS512"
         },
-        "private": {
+        "privateKey": {
             "key_ops": [
                 "sign"
             ],

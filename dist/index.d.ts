@@ -9,16 +9,16 @@ import { KeyData, VerificationResult } from './lib/types';
 export type { KeyData, VerificationResult, KeyMetadata } from './lib/types';
 export type { KeyDetails } from './lib/crypto_utils';
 export { Cryptosuites } from './lib/types';
-export { generateKey } from './lib/crypto_utils';
+export { generateKey, jwkToCrypto } from './lib/crypto_utils';
 /**
  * Generate a (separate) proof graph (or graphs), per the DI spec. The signature is stored in
- * multibase format, using base64url encoding. Keys are accepted in JWK format (and stored in JWK or in Multikey, depending on the crypto key).
+ * multibase format, using base64url encoding. Keys are accepted in WebCrypto Key format (and stored in JWK or in Multikey, depending on the crypto key).
  *
  * A single previous proof reference may also be set, although that really makes sense in the case of a single key only
  *
  * @param dataset
  * @param keyData
- * @param previous - A previous proof ID, when applicable
+ * @param previous - A previous proof ID, when applicable; this is added as an extra statement in the proof graphs. This parameter is only relevant internally when a proof chain is generated.
  * @throws - Error if there was an issue while signing.
  * @returns
  */

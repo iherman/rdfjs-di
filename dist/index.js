@@ -6,7 +6,7 @@
  * @packageDocumentation
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.verifyEmbeddedProofGraph = exports.embedProofGraph = exports.verifyProofGraph = exports.generateProofGraph = exports.generateKey = exports.Cryptosuites = void 0;
+exports.verifyEmbeddedProofGraph = exports.embedProofGraph = exports.verifyProofGraph = exports.generateProofGraph = exports.jwkToCrypto = exports.generateKey = exports.Cryptosuites = void 0;
 const n3 = require("n3");
 const types = require("./lib/types");
 const debug = require("./lib/debug");
@@ -16,17 +16,22 @@ var types_1 = require("./lib/types");
 Object.defineProperty(exports, "Cryptosuites", { enumerable: true, get: function () { return types_1.Cryptosuites; } });
 var crypto_utils_1 = require("./lib/crypto_utils");
 Object.defineProperty(exports, "generateKey", { enumerable: true, get: function () { return crypto_utils_1.generateKey; } });
+Object.defineProperty(exports, "jwkToCrypto", { enumerable: true, get: function () { return crypto_utils_1.jwkToCrypto; } });
 // n3.DataFactory is a namespace with some functions...
-const { quad, namedNode } = n3.DataFactory;
+const { quad } = n3.DataFactory;
 async function generateProofGraph(dataset, keyData, previous) {
     // Start fresh with results
     const report = { errors: [], warnings: [] };
-    // This is to be signed
-    const toBeSigned = await (0, utils_1.calculateDatasetHash)(dataset);
+    // This is not optimal. It will regenerate the hash for every key and, except for an occasional ECDSA+P-384, it will generate the same data. 
+    // Some sort of a caching information on the hash values could replace this, but that is left for later...
+    const signAndGenerate = async (keypair) => {
+        const toBeSigned = await (0, utils_1.calculateDatasetHash)(dataset, keypair.publicKey);
+        return (0, proof_utils_1.generateAProofGraph)(report, toBeSigned, keypair, previous);
+    };
     // prepare for the overload of arguments
     const keyPairs = (0, utils_1.isKeyData)(keyData) ? [keyData] : keyData;
     // execute the proof graph generation concurrently
-    const promises = Array.from(keyPairs).map((keypair) => (0, proof_utils_1.generateAProofGraph)(report, toBeSigned, keypair, previous));
+    const promises = Array.from(keyPairs).map(signAndGenerate);
     const retval = await Promise.all(promises);
     // return by taking care of overloading.
     if (report.errors.length !== 0) {
@@ -61,7 +66,6 @@ exports.generateProofGraph = generateProofGraph;
  */
 async function verifyProofGraph(dataset, proofGraph) {
     const report = { errors: [], warnings: [] };
-    const hash = await (0, utils_1.calculateDatasetHash)(dataset);
     const proofGraphs = (0, utils_1.isDatasetCore)(proofGraph) ? [proofGraph] : proofGraph;
     const proofs = proofGraphs.map((pr) => {
         return {
@@ -69,7 +73,7 @@ async function verifyProofGraph(dataset, proofGraph) {
             proofGraph: undefined,
         };
     });
-    const verified = await (0, proof_utils_1.verifyProofGraphs)(report, hash, proofs);
+    const verified = await (0, proof_utils_1.verifyProofGraphs)(report, dataset, proofs);
     return {
         verified,
         verifiedDocument: verified ? dataset : null,
@@ -161,6 +165,7 @@ async function embedProofGraph(dataset, keyData, anchor) {
         allProofs = proofGraphs.map(storeProofData);
     }
     // Merge all generated proof datasets into the result
+    // The reference to the proof graph(s) from the dedicated anchor is added to the result
     for (const proof of allProofs) {
         if (anchor) {
             output.add(quad(anchor, proof_utils_1.sec_proof, proof.proofGraph));
@@ -231,7 +236,7 @@ async function verifyEmbeddedProofGraph(dataset, anchor) {
     // By now, we got the identification of all the proof graphs, we can separate the quads into 
     // the "real" data graph and the relevant proof graphs
     for (const q of dataset) {
-        if (q.predicate.equals(proof_utils_1.sec_proof) && proofGraphs.has(q.graph)) {
+        if (q.predicate.equals(proof_utils_1.sec_proof) && proofGraphs.has(q.object)) {
             // this is an extra entry, not part of the triples that were signed
             // neither it is part of any proof graphs
             continue;
@@ -280,8 +285,7 @@ async function verifyEmbeddedProofGraph(dataset, anchor) {
                 // These are the intermediate quads added to the dataset to secure the chain
                 // (This is an n3 specific API method!)
                 dataStore.addQuads(extraQuads);
-                const hash = await (0, utils_1.calculateDatasetHash)(dataStore);
-                const verifiedChainLink = await (0, proof_utils_1.verifyProofGraphs)(report, hash, [allProofs[i]]);
+                const verifiedChainLink = await (0, proof_utils_1.verifyProofGraphs)(report, dataStore, [allProofs[i]]);
                 verified_list.push(verifiedChainLink);
                 dataStore.removeQuads(extraQuads);
             }
@@ -296,9 +300,8 @@ async function verifyEmbeddedProofGraph(dataset, anchor) {
     }
     else {
         // This is the simple case...
-        const hash = await (0, utils_1.calculateDatasetHash)(dataStore);
         const proofs = proofGraphs.data();
-        const verified = await (0, proof_utils_1.verifyProofGraphs)(report, hash, proofs);
+        const verified = await (0, proof_utils_1.verifyProofGraphs)(report, dataStore, proofs);
         return {
             verified,
             verifiedDocument: verified ? dataStore : null,

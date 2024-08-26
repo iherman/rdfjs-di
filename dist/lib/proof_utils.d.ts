@@ -60,8 +60,8 @@ export declare function generateAProofGraph(report: Errors, hashValue: string, k
  * If any error occurs in any proof graph the result is `false`; otherwise, result is the conjunction of each individual proof graph verifications.
  *
  * @param report - placeholder for error reports
- * @param hash
+ * @param dataset - the original dataset to be checked with
  * @param proofs
  * @returns
  */
-export declare function verifyProofGraphs(report: Errors, hash: string, proofs: ProofStore[]): Promise<boolean>;
+export declare function verifyProofGraphs(report: Errors, dataset: rdf.DatasetCore, proofs: ProofStore[]): Promise<boolean>;

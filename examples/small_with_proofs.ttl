@@ -10,7 +10,7 @@
 <file:///small.ttl> foaf:primaryTopic <https://iherman.github.io/rdfjs-c14n/>;
     dc:issued "2024-02-14T13:21:08.700Z"^^xsd:dateTime;
     foaf:maker <https://www.ivan-herman.net/foaf#me>;
-    sec:proof _:b0, _:b1, _:b2.
+    sec:proof _:b0, _:b1, _:b2, _:b3.
 <https://iherman.github.io/rdfjs-c14n/> foaf:maker <https://www.ivan-herman.net/foaf#me>;
     a doap:Project;
     doap:name "rdfjs-c14n";
@@ -41,40 +41,50 @@ _:n3-0 a doap:Version;
 _:n3-1 a doap:GitRepository;
     doap:location <https://github.com/iherman/rdfjs-c14n>.
 _:b0 {
-    <urn:uuid:db344926-b19c-4524-a182-8f2ebc20a64f> a sec:DataIntegrityProof;
-        sec:verificationMethod <urn:uuid:20c68ced-4661-49cd-a53c-cac6467bb049>;
-        sec:created "2024-06-13T10:59:03.697Z"^^xsd:dateTime;
+    <urn:uuid:18d80a9b-2e6e-46bd-965b-4dcd4c16dc65> a sec:DataIntegrityProof;
+        sec:verificationMethod <urn:uuid:5b7b172d-008b-4271-a3dc-1d26561a9edc>;
+        sec:created "2024-08-26T10:22:54.670Z"^^xsd:dateTime;
         sec:proofPurpose sec:authenticationMethod, sec:assertionMethod;
         sec:cryptosuite "ecdsa-rdfc-2019";
-        sec:proofValue "urJNzhMAMKuYBJfxs9SouecmsKzK3NO8YPPRO1HdA9n_Y7EwJmm3hEljXLEgBp30uxvk6fUBTTGTQSv9Utcgwyw".
-    <urn:uuid:20c68ced-4661-49cd-a53c-cac6467bb049> a sec:Multikey;
-        sec:controller <https://www.ivan-herman.net#me>;
-        sec:expires "2055-02-24T00:00:00Z"^^xsd:dateTime;
-        sec:publicKeyMultibase "z4oJ8afhsNVicQJMz5J46thJ84ZBYor4bFL6RBq6F9PdGaV7nUykNfGAQL5PkdqS5THaTVhQQ3oyAtgQsFkY4xNETTxMC"
+        sec:proofValue "uRDI1oMINJuPtNBgZh8z-utklNzwB7QgVmbeBWYx1jxJMYsG7rulDvFRSNbMgh_HGwHi3AptFZ-pBwKQ1MKuT_K9wEdgkxAKzOIcdjEOxWcTkfooQJBQRYE2bVj0xOJKX".
+    <urn:uuid:5b7b172d-008b-4271-a3dc-1d26561a9edc> a sec:Multikey;
+        sec:controller <https://www.ivan-herman.net/foaf#me>;
+        sec:expires "2055-02-24T00:00"^^xsd:dateTime;
+        sec:publicKeyMultibase "z82LkkjyZA5dCiVn8aUWe9CPJW5DRXJFC2o1df9fyevhN2xJYeZLF6wDfoe3N6c4MSEmMgo".
 }
 _:b1 {
-    <urn:uuid:74d4c9a2-6ef4-4faa-b331-c5b5bf43e8f2> a sec:DataIntegrityProof;
-        sec:verificationMethod <urn:uuid:a86eb039-7969-43e6-861e-4832484d4f21>;
-        sec:created "2024-06-13T10:59:03.700Z"^^xsd:dateTime;
+    <urn:uuid:7944b4d9-da71-4b58-a452-30d56c5b923f> a sec:DataIntegrityProof;
+        sec:verificationMethod <urn:uuid:0718583c-11d3-4f10-8554-59cc4b16f808>;
+        sec:created "2024-08-26T10:22:54.672Z"^^xsd:dateTime;
         sec:proofPurpose sec:authenticationMethod, sec:assertionMethod;
-        sec:cryptosuite "eddsa-rdfc-2022";
-        sec:proofValue "ud4-j9bUfwi5LlWX9BPB4cgVlCSsAV2zw_-cMd_Ar84kNnrJyB8hPoJzXzKPwxFZoqU1PJHwkNbc1WCopHIEhCw".
-    <urn:uuid:a86eb039-7969-43e6-861e-4832484d4f21> a sec:Multikey;
-        sec:controller <https://example.org/key/#ivan_eddsa>;
+        sec:cryptosuite "ecdsa-rdfc-2019";
+        sec:proofValue "uUPlUImSdZc4nojH5lXgxuu5vQqoryyzYBr5BxXb2i6xhDfRFmxRyZyXYRM7wkMMjPW3c8RmWmjDFXm2XNxkBHA".
+    <urn:uuid:0718583c-11d3-4f10-8554-59cc4b16f808> a sec:Multikey;
+        sec:controller <https://www.ivan-herman.net#me>;
         sec:expires "2055-02-24T00:00:00Z"^^xsd:dateTime;
-        sec:publicKeyMultibase "z6MkqPUPcdvvixcfgGqqEZJ4WZTiDwaCsqF8jHqR5UZA2iae"
+        sec:publicKeyMultibase "zDnaekempymgV5Ys12tCizdC3RG7W9QRvpMn9oU5yhjbVQBd8".
 }
 _:b2 {
-    <urn:uuid:28157208-edf7-48c8-adbc-9fe19051f960> a sec:DataIntegrityProof;
-        sec:verificationMethod <urn:uuid:08d33dfb-4ad5-40f6-8c0a-9ef6adad62cc>;
-        sec:created "2024-06-13T10:59:03.700Z"^^xsd:dateTime;
+    <urn:uuid:76547b78-aa24-4ad0-a7e5-fb44af65eda8> a sec:DataIntegrityProof;
+        sec:verificationMethod <urn:uuid:485ac7df-608e-44b1-b671-0ad2bcf6b312>;
+        sec:created "2024-08-26T10:22:54.672Z"^^xsd:dateTime;
+        sec:proofPurpose sec:authenticationMethod, sec:assertionMethod;
+        sec:cryptosuite "eddsa-rdfc-2022";
+        sec:proofValue "u8nRDH32bPe7Ih3kkU_oZHCiUO6EnxEE-hD5adrNzXjd9tUIDR7erUuDkakHduMB6donIi9JUkWVBM_wQjwS5Aw".
+    <urn:uuid:485ac7df-608e-44b1-b671-0ad2bcf6b312> a sec:Multikey;
+        sec:controller <https://example.org/key/#ivan_eddsa>;
+        sec:expires "2055-02-24T00:00:00Z"^^xsd:dateTime;
+        sec:publicKeyMultibase "z6MkqPUPcdvvixcfgGqqEZJ4WZTiDwaCsqF8jHqR5UZA2iae".
+}
+_:b3 {
+    <urn:uuid:c8441ff2-e2aa-4ea6-8f24-607db15d7295> a sec:DataIntegrityProof;
+        sec:verificationMethod <urn:uuid:f265182a-f682-4a6a-af89-4b489876573a>;
+        sec:created "2024-08-26T10:22:54.672Z"^^xsd:dateTime;
         sec:proofPurpose sec:authenticationMethod, sec:assertionMethod;
         sec:cryptosuite "rsa-pss-rdfc-ih";
-        sec:proofValue "uSwkC_tru-RdSg1Gnpwt57Z3kksWyworJIX1nQ8VGN2qq8Y1XBD2DSWUOvSbfjaJhNj7mvx17aLhHn1LUcZmFQ_vh3UYWp0i7Pqd_rca4uE21jcUCzS6UGo1ivn1966uYv2haZR8yVA09rs0_IQgKvJI8gb_zL3Y5v_Ew7kBy1YaLw8CIFXplD_NKDeGssHfXKtiIWz17M4EsGK773ndVkQqy89nGAXNIxaEYKMFyqByvgGUvN0n1MnGPvPu1qTSQgz5QW-zswRLmYdnPn6_ckCGzH_BYdZP0W6Xc_aXzU2nzatH0XCNnVIWac_5qG0T74j-MobKNCujE_92BdRVSOg".
-    <urn:uuid:08d33dfb-4ad5-40f6-8c0a-9ef6adad62cc> a sec:JsonWebKey;
+        sec:proofValue "urDu5X5nIp-RqF_biBq1dK9YqoS03cHcWX1P4B5op-wffFpuSMIS5pJSQYtbJ85q38f8p2CfGM-u6oDvH8p0-f0LIjWsEpizqhNGM4CkpdthLVUKeDyQWOr9dXFx-76LIAhU7DbJ-Y-H1OO7Q_s1vnDeXrbUSOyuY-NrO5M9t63-aGX6yp-DkhCcP5EnqYlanVAEOgeP7FFX7X3OZSh35vCI_4RrncuJO1-VKAEWUFhp0H911c4SUYWmyvk9SWwAI2lHcptew3LnhO_0jzqrGu7lW9ikMDcIxmIaB1TPhmKtd5qzE3TIOC6dMJNlM_p3QGsP4o4HoMp0pxPntAhaLxw".
+    <urn:uuid:f265182a-f682-4a6a-af89-4b489876573a> a sec:JsonWebKey;
         sec:controller <https://www.ivan-herman.net#me>;
         sec:expires "2050-02-24T00:00:00Z"^^xsd:dateTime;
-        sec:publicKeyJwk "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"RSA\",\"n\":\"zX1p6Rl0kTtbFAiISqXQbT9U6kqqIFRfualifsLA5ZNFQMDvuw3cqYUqzIyHAVYV0Bps-mXmwFVjsetQIzqhE0X2VhJ8wBS-bGxm2_E0rQ9y35mN_dWfnVhJYtONrLjkduAk04Xouws60X2ye0QHhG63j0CLNj6bqJQ_fOE_ankHxjGnZ7H7tPIeJfj9Md2GMx98BEr_8iwFXPJ5zT3_ET1zdPUGJV3r6pTOTu5H6sH5457TxCeMIIZfQ3hn3f5lz_5JL5ahtIqZ1BgaAYt5bgg63oqmn67V1fmJ08tx1LT6BbGkt1WQBv8aNgm3Z5ztLWC8MJiqgeFpyQFUOIkVCQ\",\"e\":\"AQAB\",\"alg\":\"PS256\"}"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON>
+        sec:publicKeyJwk "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"RSA\",\"n\":\"zX1p6Rl0kTtbFAiISqXQbT9U6kqqIFRfualifsLA5ZNFQMDvuw3cqYUqzIyHAVYV0Bps-mXmwFVjsetQIzqhE0X2VhJ8wBS-bGxm2_E0rQ9y35mN_dWfnVhJYtONrLjkduAk04Xouws60X2ye0QHhG63j0CLNj6bqJQ_fOE_ankHxjGnZ7H7tPIeJfj9Md2GMx98BEr_8iwFXPJ5zT3_ET1zdPUGJV3r6pTOTu5H6sH5457TxCeMIIZfQ3hn3f5lz_5JL5ahtIqZ1BgaAYt5bgg63oqmn67V1fmJ08tx1LT6BbGkt1WQBv8aNgm3Z5ztLWC8MJiqgeFpyQFUOIkVCQ\",\"e\":\"AQAB\",\"alg\":\"PS256\"}"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON>.
 }
-
->>> No verification was required

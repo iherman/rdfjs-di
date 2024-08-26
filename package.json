@@ -1,12 +1,13 @@
 {
   "name": "rdfjs-di",
-  "version": "0.0.96",
-  "date": "2024-07-24",
+  "version": "0.1.0",
+  "date": "2024-08-24",
   "description": "Secure an RDF Dataset through VC's Data Integrity",
   "main": "dist/index.js",
   "scripts": {
     "test": "./node_modules/.bin/ts-node testing/run/main.ts",
     "crkey": "./node_modules/.bin/ts-node testing/run/createKeys.ts",
+    "crypto": "./node_modules/.bin/ts-node testing/run/testCrypto.ts",
     "docs": "./node_modules/.bin/typedoc index.ts lib/*",
     "dist": "tsc -d"
   },
@@ -30,13 +31,14 @@
     "dist/**/*"
   ],
   "engines": {
-    "node": ">21.0.0"
+    "node": ">=22.6.0"
   },
   "dependencies": {
     "@rdfjs/types": "^1.1.0",
     "@truestamp/canonify": "^2.1.0",
     "base58-universal": "^2.0.0",
     "base64url": "^3.0.1",
+    "multikey-webcrypto": "^0.5.0",
     "n3": "^1.17.2",
     "rdfjs-c14n": "^3.1.0",
     "uuid": "^9.0.1"

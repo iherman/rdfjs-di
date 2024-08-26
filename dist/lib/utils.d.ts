@@ -11,7 +11,6 @@
  */
 import * as rdf from '@rdfjs/types';
 import * as n3 from 'n3';
-import { KeyMetadata } from './types';
 /***************************************************************************************
  * Namespace handling
  **************************************************************************************/
@@ -126,19 +125,25 @@ export declare class DatasetMap {
  */
 export declare function isDatasetCore(obj: any): obj is rdf.DatasetCore;
 /**
- * Type guard to check if an object implements the KeyPair interface.
+ * Type guard to check if an object implements the CryptoKeyPair interface.
  *
  * @param obj
  * @returns
  */
-export declare function isKeyData(obj: any): obj is KeyMetadata;
+export declare function isKeyData(obj: any): obj is CryptoKeyPair;
 /**
  * Calculate the canonical hash of a dataset using the implementation of RDFC 1.0.
  *
+ * Note that the hash calculation's detail depend on the crypto key being used.
+ * If the key belongs to an ECDSA key, and the corresponding curve is P-384, then
+ * SHA-384 must be used by the algorithm. Hence the presence of the second
+ * argument in the call.
+ *
  * @param dataset
+ * @param key - to decide whether SHA-384 should be used instead of the (default) SHA-256
  * @returns
  */
-export declare function calculateDatasetHash(dataset: rdf.DatasetCore): Promise<string>;
+export declare function calculateDatasetHash(dataset: rdf.DatasetCore, key?: CryptoKey): Promise<string>;
 /**
  * Create and store the values in a dataset in a new n3 Store. This may be
  * necessary because the methods are not supposed to modify the original
