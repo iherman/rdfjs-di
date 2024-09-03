@@ -1,5 +1,28 @@
 [
     {
+        "privateKey": {
+            "key_ops": [
+                "sign"
+            ],
+            "ext": true,
+            "crv": "Ed25519",
+            "d": "Hpuup3qiMXpy1d20hTYBsujTt957jDx3LPgvMEtPpNk",
+            "x": "ongxF1Oaz0kjHzvVHQEu1fZuONk05Sl3DGttVCrdkNs",
+            "kty": "OKP"
+        },
+        "publicKey": {
+            "key_ops": [
+                "verify"
+            ],
+            "ext": true,
+            "crv": "Ed25519",
+            "x": "ongxF1Oaz0kjHzvVHQEu1fZuONk05Sl3DGttVCrdkNs",
+            "kty": "OKP"
+        },
+        "controller": "https://example.org/key/#ivan_eddsa",
+        "expires": "2055-02-24T00:00:00Z"
+    },
+    {
         "publicKey": {
             "key_ops": [
                 "verify"
@@ -47,29 +70,6 @@
             "d": "4Gd_JxAFt1zA2kWMyMyRlJcEtyw2eIroUmbXawfT5Ls"
         },
         "controller": "https://www.ivan-herman.net#me",
-        "expires": "2055-02-24T00:00:00Z"
-    },
-    {
-        "privateKey" : {
-            "key_ops": [
-                "sign"
-            ],
-            "ext": true,
-            "crv": "Ed25519",
-            "d": "Hpuup3qiMXpy1d20hTYBsujTt957jDx3LPgvMEtPpNk",
-            "x": "ongxF1Oaz0kjHzvVHQEu1fZuONk05Sl3DGttVCrdkNs",
-            "kty": "OKP"
-        },
-        "publicKey": {
-            "key_ops": [
-                "verify"
-            ],
-            "ext": true,
-            "crv": "Ed25519",
-            "x": "ongxF1Oaz0kjHzvVHQEu1fZuONk05Sl3DGttVCrdkNs",
-            "kty": "OKP"
-        },
-        "controller": "https://example.org/key/#ivan_eddsa",
         "expires": "2055-02-24T00:00:00Z"
     },
     {
