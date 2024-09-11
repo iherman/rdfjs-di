@@ -14,6 +14,8 @@
 
 import * as types from "./types";
 import { KeyMetadata, KeyData, Cryptosuites, Errors } from './types';
+import * as base58 from './encodings/base58/index';
+
 
 /** JWK values for the RSA algorithms that are relevant for this package */
 type Alg = "RS256" | "RS384" | "PS256" | "PS384";
@@ -137,16 +139,6 @@ function algorithmDataCR(report: Errors, key: CryptoKey): WebCryptoAPIData | nul
  * 
 ***********************************************************************************/
 
-/*
- * These two came from perplexity, hopefully it is correct...
- */
-const base64ToUrl = (base64String: string): string => {
-    return base64String.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-};
-
-const urlToBase64 = (base64Url: string): string => {
-    return base64Url.replace(/-/g, '+').replace(/_/g, '/');
-};
 
 /**
  * Text to array buffer, needed for crypto operations
@@ -154,47 +146,6 @@ const urlToBase64 = (base64Url: string): string => {
  */
 function textToArrayBuffer(text: string): ArrayBuffer {
     return (new TextEncoder()).encode(text).buffer;
-}
-
-/**
- * Convert an array buffer to a base64url value.
- * 
- * (Created with the help of chatgpt...)
- * 
- * @param arrayBuffer 
- * @returns 
- */
-function arrayBufferToBase64Url(arrayBuffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(arrayBuffer);
-
-    let binary: string = "";
-    for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    const base64String = btoa(binary);
-
-    return base64ToUrl(base64String);
-}
-
-/**
- * Convert a base64url value to an array buffer
- * 
- * (Created with the help of chatgpt...)
- * 
- * @param url 
- * @returns 
- */
-function base64UrlToArrayBuffer(url: string): ArrayBuffer {
-    const base64string = urlToBase64(url);
-
-    const binary = atob(base64string);
-
-    const byteArray = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        byteArray[i] = binary.charCodeAt(i);
-    }
-
-    return byteArray.buffer;
 }
 
 /***********************************************************************************
@@ -242,7 +193,8 @@ export async function sign(report: Errors, message: string, privateKey: CryptoKe
         try {
             const rawSignature: ArrayBuffer = await crypto.subtle.sign(algorithm, privateKey, rawMessage);
             // Turn the the signature into Base64URL, and then into multicode
-            return `u${arrayBufferToBase64Url(rawSignature)}`;
+            return `z${base58.encode(new Uint8Array(rawSignature))}`;
+            // return `u${arrayBufferToBase64Url(rawSignature)}`;
         } catch(e) {
             report.errors.push(new types.Proof_Generation_Error(e.message));
             return null;
@@ -263,11 +215,14 @@ export async function sign(report: Errors, message: string, privateKey: CryptoKe
  */
 export async function verify(report: Errors, message: string, signature: string, publicKey: CryptoKey): Promise<boolean> {
     const rawMessage: ArrayBuffer = textToArrayBuffer(message);
-    if (signature.length === 0 || signature[0] !== 'u') {
+    if (signature.length === 0 || signature[0] !== 'z') {
         report.errors.push(new types.Proof_Verification_Error(`Signature is of an incorrect format (${signature})`));
         return false;
     }
-    const rawSignature: ArrayBuffer = base64UrlToArrayBuffer(signature.slice(1));
+
+    const rawSignature: ArrayBuffer = base58.decode(signature.slice(1));
+
+    // const rawSignature: ArrayBuffer = base64UrlToArrayBuffer(signature.slice(1));
 
     // get the algorithm details
     const algorithm: WebCryptoAPIData | null = algorithmDataCR(report, publicKey);
