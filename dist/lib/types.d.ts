@@ -15,7 +15,7 @@ export interface VerificationResult extends Errors {
     verifiedDocument: rdf.DatasetCore | null;
 }
 /**
- * Some additional meta data that can be stored with the keys, and then re-appear as part of the proof graphs
+ * Some additional metadata that can be stored with the keys, and then re-appear as part of the proof graphs
  */
 export interface KeyMetadata {
     controller?: string;
@@ -39,7 +39,7 @@ export declare abstract class ProblemDetail extends Error {
     title: string;
     /** More detailed description of the error condition */
     detail: string;
-    constructor(detail: string, title: string, code: number);
+    protected constructor(detail: string, title: string, code: number);
 }
 export interface Errors {
     warnings: ProblemDetail[];

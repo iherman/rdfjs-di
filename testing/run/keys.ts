@@ -13,7 +13,7 @@ interface KeyMetadata {
     revoked?: string,
     cryptosuite?: string,
 }
-interface jwkKeyData extends KeyMetadata, KeyPair {};
+interface jwkKeyData extends KeyMetadata, KeyPair {}
 
 export async function get_keys(): Promise<KeyData[]> {
     const raw_keys: string = await fs.readFile('testing/keys.json', 'utf-8');
@@ -21,11 +21,11 @@ export async function get_keys(): Promise<KeyData[]> {
     const output: KeyData[] = [];
 
     for (const key of jwkKeyData) {
-        const publ: CryptoKey = await jwkToCrypto(key.publicKey);
-        const secr: CryptoKey = await jwkToCrypto(key.privateKey, true)
+        const publicKey: CryptoKey = await jwkToCrypto(key.publicKey);
+        const privateKey: CryptoKey = await jwkToCrypto(key.privateKey, true)
         const newItem: KeyData = {
-            publicKey: publ,
-            privateKey: secr,
+            publicKey: publicKey,
+            privateKey: privateKey,
         };
         if (key.controller)  newItem.controller = key.controller;
         if (key.expires)     newItem.expires = key.expires;

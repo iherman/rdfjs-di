@@ -14,7 +14,7 @@
 
 import * as types from "./types";
 import { KeyMetadata, KeyData, Cryptosuites, Errors } from './types';
-import * as base58 from './encodings/base58/index';
+import { base58 }                                     from "@scure/base";
 
 
 /** JWK values for the RSA algorithms that are relevant for this package */
@@ -60,7 +60,7 @@ const DEFAULT_HASH            = "SHA-256";
 const DEFAULT_CURVE           = "P-256";
 
 /**
- * Mapping between the "alg values in the JWK instance and the necessary 
+ * Mapping between the "alg" values in the JWK instance and the necessary
  * terms for the WebCrypto API
  */
 const RsaAlgs: Record<Alg, WebCryptoAPIData> = {
@@ -72,8 +72,7 @@ const RsaAlgs: Record<Alg, WebCryptoAPIData> = {
 
 /**
  * Mapping of the JWK instance and the corresponding terms for the WebCrypto API.
- * 
- * @param report 
+ *
  * @param key 
  * @returns 
  */
@@ -103,12 +102,11 @@ function algorithmDataJWK(key: JsonWebKey): WebCryptoAPIData | null {
 
 /**
  * Mapping of the CryptoKey instance and the corresponding terms for the WebCrypto API.
- * 
- * @param report 
+ *
  * @param key 
  * @returns 
  */
-function algorithmDataCR(report: Errors, key: CryptoKey): WebCryptoAPIData | null {
+function algorithmDataCR(key: CryptoKey): WebCryptoAPIData | null {
     const alg = key.algorithm;
     switch (alg.name) {
         case "RSA-PSS": {
@@ -185,14 +183,14 @@ export async function sign(report: Errors, message: string, privateKey: CryptoKe
     const rawMessage: ArrayBuffer = textToArrayBuffer(message);
 
     // The crypto algorithm to be used with this key:
-    const algorithm: WebCryptoAPIData | null = algorithmDataCR(report, privateKey);
+    const algorithm: WebCryptoAPIData | null = algorithmDataCR(privateKey);
 
     if (algorithm === null) {
         return null;
     } else {
         try {
             const rawSignature: ArrayBuffer = await crypto.subtle.sign(algorithm, privateKey, rawMessage);
-            // Turn the the signature into Base64URL, and then into multicode
+            // Turn the signature into Base64URL, and then into multicode
             return `z${base58.encode(new Uint8Array(rawSignature))}`;
             // return `u${arrayBufferToBase64Url(rawSignature)}`;
         } catch(e) {
@@ -225,17 +223,17 @@ export async function verify(report: Errors, message: string, signature: string,
     // const rawSignature: ArrayBuffer = base64UrlToArrayBuffer(signature.slice(1));
 
     // get the algorithm details
-    const algorithm: WebCryptoAPIData | null = algorithmDataCR(report, publicKey);
+    const algorithm: WebCryptoAPIData | null = algorithmDataCR(publicKey);
 
     if (algorithm === null) {
         return false;
     } else {
         try {
-            const retval: boolean = await crypto.subtle.verify(algorithm, publicKey, rawSignature, rawMessage);
-            if (retval === false) {
+            const output: boolean = await crypto.subtle.verify(algorithm, publicKey, rawSignature, rawMessage);
+            if (output === false) {
                 report.errors.push(new types.Proof_Verification_Error(`Signature ${signature} is invalid`));
             }
-            return retval;
+            return output;
         } catch(e) {
             report.errors.push(new types.Proof_Generation_Error(e.message));
             return false;

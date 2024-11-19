@@ -10,10 +10,10 @@
  * 
  */
 
-import { RDFC10 }               from 'rdfjs-c14n';
-import * as rdf                 from '@rdfjs/types';
-import * as n3                  from 'n3';
-import * as debug               from './debug';
+import { RDFC10 } from 'rdfjs-c14n';
+import * as rdf from '@rdfjs/types';
+import * as n3 from 'n3';
+// import * as debug               from './debug';
 
 const { namedNode, quad } = n3.DataFactory;
 
@@ -22,7 +22,7 @@ const { namedNode, quad } = n3.DataFactory;
  **************************************************************************************/
 
 /**
- * A simple namespace handler; I was not sure I fully understood the n3 version, and 
+ * A simple namespace handler; I was not sure that I fully understood the n3 version, and
  * I found no reliable documentation (...)
  * 
  * This function returns a function that can be used to generate a proper URI for a given prefix.
@@ -33,7 +33,7 @@ const { namedNode, quad } = n3.DataFactory;
 export function createPrefix(uri: string): (l: string) => rdf.NamedNode {
     class prefix {
         private _mapping: Record<string, rdf.NamedNode> = {};
-        private _base: string;
+        private readonly _base: string;
         constructor(base: string) {
             this._base = base;
         }
@@ -41,17 +41,16 @@ export function createPrefix(uri: string): (l: string) => rdf.NamedNode {
             if (local in this._mapping) {
                 return this._mapping[local];
             } else {
-                const retval: rdf.NamedNode = namedNode(`${this._base}${local}`);
-                this._mapping[local] = retval;
-                return retval;
+                const output: rdf.NamedNode = namedNode(`${this._base}${local}`);
+                this._mapping[local] = output;
+                return output;
             }
         }
     }
     const mapping = new prefix(uri);
-    const get_value = (local: string): rdf.NamedNode => {
+    return (local: string): rdf.NamedNode => {
         return mapping.value(local);
     };
-    return get_value;
 }
 
 /***************************************************************************************
@@ -80,8 +79,8 @@ export interface Proof {
 }
 
 /**
- * The general structure for a Proof using n3.Store specifically; it also has a `perviousProof` key. 
- * This subclass is used when key chains or sets are extracted from an embedded proof.
+ * The general structure for a Proof using n3.Store specifically; it also has a `previousProof` key.
+ * This subclass is used when keychains or sets are extracted from an embedded proof.
  */
 export interface ProofStore extends Proof {
     proofQuads : n3.Store,
@@ -252,7 +251,7 @@ export function isKeyData(obj: any): obj is CryptoKeyPair {
  * 
  * Note that the hash calculation's detail depend on the crypto key being used.
  * If the key belongs to an ECDSA key, and the corresponding curve is P-384, then
- * SHA-384 must be used by the algorithm. Hence the presence of the second
+ * SHA-384 must be used by the algorithm. That is the reason for the presence of the second
  * argument in the call.
  * 
  * @param dataset 
@@ -268,8 +267,7 @@ export async function calculateDatasetHash(dataset: rdf.DatasetCore, key ?: Cryp
     }
 
     const canonical_quads: string = await rdfc10.canonicalize(dataset);
-    const datasetHash: string = await rdfc10.hash(canonical_quads);
-    return datasetHash;
+    return await rdfc10.hash(canonical_quads);
 }
 
 /**
@@ -283,9 +281,9 @@ export async function calculateDatasetHash(dataset: rdf.DatasetCore, key ?: Cryp
  * @returns 
  */
 export function copyToStore(dataset: rdf.DatasetCore): n3.Store {
-    const retval = new n3.Store();
-    for (const q of dataset) retval.add(q);
-    return retval;
+    const output = new n3.Store();
+    for (const q of dataset) output.add(q);
+    return output;
 }
 
 /**
@@ -325,14 +323,14 @@ export function refactorBnodes(base: n3.Store, toTransform: rdf.DatasetCore): rd
         }
     }
 
-    const retval: n3.Store = new n3.Store();
+    const output: n3.Store = new n3.Store();
     for(const q of toTransform) {
         let subject = newTerm(q.subject) as rdf.Quad_Subject;
         let predicate = q.predicate;
         let object = newTerm(q.object) as rdf.Quad_Object;
-        retval.add(quad(subject,predicate,object));
+        output.add(quad(subject,predicate,object));
     }
-    return retval;
+    return output;
 }
 
 

@@ -47,7 +47,7 @@ async function main() {
     const program = new Command();
     program
         .name('main [testfile]')
-        .description('Make a roundtrip for signing and verifying')
+        .description('Make a round-trip for signing and verifying')
         .usage('[options] [file name]')
         .option('-a --anchor', 'Anchor the proof graph to the file name (if relevant)')
         .option('-e --embed',  'Create an embedded proof')
@@ -60,12 +60,12 @@ async function main() {
 
     const options = program.opts();
 
-    const embed  = options.embed ? true : false ;
-    const verify = options.verify ? true : false ;
-    const quiet = options.quiet ? true : false;
-    const no_output = options.no ? true : false;
-    const proof_set = options.set ? true : false;
-    const proof_chain = options.chain ? true : false;
+    const embed  = !!options.embed ;
+    const verify = !!options.verify ;
+    const quiet = !!options.quiet;
+    const no_output = !!options.no;
+    const proof_set = !!options.set;
+    const proof_chain = !!options.chain;
 
     const input = (program.args.length === 0) ? 'small.ttl' : program.args[0];
     const anchor = options.anchor ? DataFactory.namedNode(`file:///${input}`) : undefined ;
@@ -87,7 +87,6 @@ async function main() {
                 console.log(`>>> No verification was required`) 
             }
         } else {
-            let result: boolean[];
             if (proof_set || proof_chain) {
                 const proofs: rdf.DatasetCore[] = await generateProofGraph(dataset, keyPairs);
                 if (verify) {

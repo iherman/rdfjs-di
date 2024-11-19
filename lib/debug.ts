@@ -26,8 +26,6 @@ export function log(str: any, dataset?: rdf.DatasetCore): void {
     }
 } 
 
-
-
 /**
  * Convert the graph into NQuads, more exactly into an array of individual NQuad statement
  * @param quads 
@@ -36,16 +34,16 @@ export function log(str: any, dataset?: rdf.DatasetCore): void {
 function dataset_to_nquads(quads: Iterable<rdf.Quad>): string[] {
     const n3Writer = new n3.Writer();
     const quad_to_nquad = (quad: rdf.Quad): string => {
-        const retval = n3Writer.quadToString(quad.subject, quad.predicate, quad.object, quad.graph);
+        const output = n3Writer.quadToString(quad.subject, quad.predicate, quad.object, quad.graph);
         // deno-lint-ignore no-regex-spaces
-        return retval.endsWith('  .') ? retval.replace(/  .$/, ' .') : retval;
+        return output.endsWith('  .') ? output.replace(/ {2}.$/, ' .') : output;
     };
 
-    const retval: string[] = [];
+    const output: string[] = [];
     for (const quad of quads) {
-        retval.push(quad_to_nquad(quad));
+        output.push(quad_to_nquad(quad));
     }
-    return retval;
+    return output;
 }
 
 /**

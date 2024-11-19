@@ -19,7 +19,7 @@ export interface VerificationResult extends Errors {
 }
 
 /**
- * Some additional meta data that can be stored with the keys, and then re-appear as part of the proof graphs
+ * Some additional metadata that can be stored with the keys, and then re-appear as part of the proof graphs
  */
 export interface KeyMetadata {
     controller?:  string,
@@ -46,7 +46,7 @@ export abstract class ProblemDetail extends Error {
     /** More detailed description of the error condition */
     detail: string;
 
-    constructor(detail: string, title: string, code: number) {
+    protected constructor(detail: string, title: string, code: number) {
         super(detail);
         this.detail = detail;
         this.title = title;

@@ -15,7 +15,7 @@ import * as n3 from 'n3';
  * Namespace handling
  **************************************************************************************/
 /**
- * A simple namespace handler; I was not sure I fully understood the n3 version, and
+ * A simple namespace handler; I was not sure that I fully understood the n3 version, and
  * I found no reliable documentation (...)
  *
  * This function returns a function that can be used to generate a proper URI for a given prefix.
@@ -46,8 +46,8 @@ export interface Proof {
     proofQuads: rdf.DatasetCore;
 }
 /**
- * The general structure for a Proof using n3.Store specifically; it also has a `perviousProof` key.
- * This subclass is used when key chains or sets are extracted from an embedded proof.
+ * The general structure for a Proof using n3.Store specifically; it also has a `previousProof` key.
+ * This subclass is used when keychains or sets are extracted from an embedded proof.
  */
 export interface ProofStore extends Proof {
     proofQuads: n3.Store;
@@ -136,7 +136,7 @@ export declare function isKeyData(obj: any): obj is CryptoKeyPair;
  *
  * Note that the hash calculation's detail depend on the crypto key being used.
  * If the key belongs to an ECDSA key, and the corresponding curve is P-384, then
- * SHA-384 must be used by the algorithm. Hence the presence of the second
+ * SHA-384 must be used by the algorithm. That is the reason for the presence of the second
  * argument in the call.
  *
  * @param dataset

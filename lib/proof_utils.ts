@@ -59,7 +59,8 @@ export const sec_previousProof: rdf.NamedNode        = sec_prefix("previousProof
  * This function does one more step before hashing: it canonicalizes the (possible) JWK key. This
  * key is in a JSON Literal; this must be canonicalized to ensure proper validation.
  * 
- * @param proofGraph 
+ * @param proofGraph
+ * @param key
  * @returns 
  */
 async function calculateProofOptionsHash(proofGraph: rdf.DatasetCore, key: CryptoKey): Promise<string> {
@@ -68,8 +69,8 @@ async function calculateProofOptionsHash(proofGraph: rdf.DatasetCore, key: Crypt
     // 1. the proof value triple should be removed
     // 2. the value of the sec_publicKeyJwk must be canonicalized
     for (const q of proofGraph) {
-        if (q.predicate.value === sec_proofValue.value){
-            continue;
+        if (q.predicate.value === sec_proofValue.value) {
+
         } else if (q.predicate.value === sec_publicKeyJwk.value) {
             // get the JSON value from the object
             const jwk = JSON.parse(q.object.value);
@@ -99,24 +100,24 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
 
     // Generate the key data to be stored in the proof graph; either multikey or jwk, depending on the cryptosuite
     const addKeyResource = async (cryptoKey: CryptoKey, proofGraph: rdf.Quad_Subject, keyResource: rdf.Quad_Subject): Promise<rdf.Quad[]> => {
-        let retval: rdf.Quad[] = [];
+        let output: rdf.Quad[];
         if (cryptoKey.algorithm.name === "ECDSA" || cryptoKey.algorithm.name === "Ed25519") {
             // We are in multikey land...
             const multikey = await mkwc.cryptoToMultikey(cryptoKey);  
-            retval = [
+            output = [
                 quad(proofGraph, sec_prefix('cryptosuite'), literal(cryptosuite)),
                 quad(keyResource, rdf_type, sec_prefix('Multikey')),
                 quad(keyResource, sec_publicKeyMultibase, literal(multikey)),
             ];
         } else {
             const jwkKey = await crypto.subtle.exportKey("jwk", cryptoKey);
-            retval = [
+            output = [
                 quad(proofGraph, sec_prefix('cryptosuite'), literal(cryptosuite)),
                 quad(keyResource, rdf_type, sec_prefix('JsonWebKey')),
                 quad(keyResource, sec_publicKeyJwk, literal(JSON.stringify(jwkKey), rdf_json)),
             ];
         }
-        return retval;
+        return output;
     }
 
     // Create a proof graph. Just a boring set of quad generations...
@@ -176,7 +177,7 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
         proofGraph.add(quad(proofGraphResource, sec_proofValue, literal(signature)));
         return proofGraph;
     }
-};
+}
 
 /**
  * Check a single proof graph, ie, whether the included signature corresponds to the hash value.
@@ -195,7 +196,7 @@ export async function generateAProofGraph(report: Errors, hashValue: string, key
  * @param report - placeholder for error reports
  * @param dataset - the original dataset 
  * @param proof - the proof graph
- * @param proofId - Id of the proof graph, if known; used in the error reports only
+ * @param proofId - id of the proof graph, if known; used in the error reports only
  * @returns 
  */
 async function verifyAProofGraph(report: Errors, dataset: rdf.DatasetCore, proof: n3.Store, proofId: rdf.Quad_Graph | undefined): Promise < boolean> {
@@ -218,7 +219,7 @@ async function verifyAProofGraph(report: Errors, dataset: rdf.DatasetCore, proof
                 localErrors.push(new types.Proof_Transformation_Error(`Invalid proof purpose value(s): ${wrongPurposes.join(", ")}`));
             }
         }
-    };
+    }
 
     // Retrieve the proof value
     const proofValue: string | null = ((store: n3.Store): string | null => {

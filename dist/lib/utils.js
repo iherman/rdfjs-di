@@ -14,12 +14,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.extraChainQuads = exports.refactorBnodes = exports.convertToStore = exports.copyToStore = exports.calculateDatasetHash = exports.isKeyData = exports.isDatasetCore = exports.DatasetMap = exports.createPrefix = void 0;
 const rdfjs_c14n_1 = require("rdfjs-c14n");
 const n3 = require("n3");
+// import * as debug               from './debug';
 const { namedNode, quad } = n3.DataFactory;
 /***************************************************************************************
  * Namespace handling
  **************************************************************************************/
 /**
- * A simple namespace handler; I was not sure I fully understood the n3 version, and
+ * A simple namespace handler; I was not sure that I fully understood the n3 version, and
  * I found no reliable documentation (...)
  *
  * This function returns a function that can be used to generate a proper URI for a given prefix.
@@ -39,17 +40,16 @@ function createPrefix(uri) {
                 return this._mapping[local];
             }
             else {
-                const retval = namedNode(`${this._base}${local}`);
-                this._mapping[local] = retval;
-                return retval;
+                const output = namedNode(`${this._base}${local}`);
+                this._mapping[local] = output;
+                return output;
             }
         }
     }
     const mapping = new prefix(uri);
-    const get_value = (local) => {
+    return (local) => {
         return mapping.value(local);
     };
-    return get_value;
 }
 exports.createPrefix = createPrefix;
 /**
@@ -205,7 +205,7 @@ exports.isKeyData = isKeyData;
  *
  * Note that the hash calculation's detail depend on the crypto key being used.
  * If the key belongs to an ECDSA key, and the corresponding curve is P-384, then
- * SHA-384 must be used by the algorithm. Hence the presence of the second
+ * SHA-384 must be used by the algorithm. That is the reason for the presence of the second
  * argument in the call.
  *
  * @param dataset
@@ -219,8 +219,7 @@ async function calculateDatasetHash(dataset, key) {
         rdfc10.hash_algorithm = "sha384";
     }
     const canonical_quads = await rdfc10.canonicalize(dataset);
-    const datasetHash = await rdfc10.hash(canonical_quads);
-    return datasetHash;
+    return await rdfc10.hash(canonical_quads);
 }
 exports.calculateDatasetHash = calculateDatasetHash;
 /**
@@ -234,10 +233,10 @@ exports.calculateDatasetHash = calculateDatasetHash;
  * @returns
  */
 function copyToStore(dataset) {
-    const retval = new n3.Store();
+    const output = new n3.Store();
     for (const q of dataset)
-        retval.add(q);
-    return retval;
+        output.add(q);
+    return output;
 }
 exports.copyToStore = copyToStore;
 /**
@@ -277,14 +276,14 @@ function refactorBnodes(base, toTransform) {
             return term;
         }
     };
-    const retval = new n3.Store();
+    const output = new n3.Store();
     for (const q of toTransform) {
         let subject = newTerm(q.subject);
         let predicate = q.predicate;
         let object = newTerm(q.object);
-        retval.add(quad(subject, predicate, object));
+        output.add(quad(subject, predicate, object));
     }
-    return retval;
+    return output;
 }
 exports.refactorBnodes = refactorBnodes;
 /**

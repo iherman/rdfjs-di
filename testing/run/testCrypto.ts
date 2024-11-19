@@ -1,8 +1,4 @@
-import {
-    KeyData, VerificationResult,
-    generateProofGraph, verifyProofGraph,
-    embedProofGraph, verifyEmbeddedProofGraph
-} from '../../index';
+import { KeyData } from '../../index';
 import { KeyDetails }   from '../../lib/crypto_utils';
 import { Cryptosuites } from '../../lib/types';
 import { get_keys } from './keys';
